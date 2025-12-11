@@ -38,17 +38,9 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
   try {
     const sheets = getGoogleSheetsClient();
 
-    // First, get the spreadsheet metadata to find the first sheet name
-    const spreadsheet = await sheets.spreadsheets.get({
-      spreadsheetId: CLIENT_MAPPING_SHEET_ID,
-      fields: 'sheets.properties.title',
-    });
-
-    const firstSheetName = spreadsheet.data.sheets?.[0]?.properties?.title || 'Sheet1';
-
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: CLIENT_MAPPING_SHEET_ID,
-      range: `'${firstSheetName}'!A:L`,
+      range: `'All Seller Information'!A:L`,
     });
 
     const rows = response.data.values;
