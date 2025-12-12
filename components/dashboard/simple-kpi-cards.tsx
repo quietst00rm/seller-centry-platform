@@ -39,12 +39,12 @@ export function SimpleKPICards({ openViolations, atRiskSales }: SimpleKPICardsPr
           </div>
 
           <div className={cn(
-            'flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-2xl',
-            'bg-gradient-to-br from-warning/20 to-warning/5',
+            'flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-full',
+            'bg-amber-500/20',
             'flex items-center justify-center',
             'transition-transform duration-300 group-hover:scale-110'
           )}>
-            <AlertTriangle className="h-7 w-7 md:h-8 md:w-8 text-warning" />
+            <AlertTriangle className="h-7 w-7 md:h-8 md:w-8 text-amber-500" />
           </div>
         </div>
       </div>
@@ -72,12 +72,12 @@ export function SimpleKPICards({ openViolations, atRiskSales }: SimpleKPICardsPr
           </div>
 
           <div className={cn(
-            'flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-2xl',
-            'bg-gradient-to-br from-primary/20 to-primary/5',
+            'flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-full',
+            'bg-orange-500/20',
             'flex items-center justify-center',
             'transition-transform duration-300 group-hover:scale-110'
           )}>
-            <DollarSign className="h-7 w-7 md:h-8 md:w-8 text-primary" />
+            <DollarSign className="h-7 w-7 md:h-8 md:w-8 text-orange-500" />
           </div>
         </div>
       </div>

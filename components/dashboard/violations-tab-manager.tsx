@@ -20,13 +20,13 @@ export function ViolationsTabManager({ onViewCase }: ViolationsTabManagerProps) 
           <TabsList className="grid w-full sm:w-[400px] grid-cols-2 bg-muted/50 border border-border/50">
             <TabsTrigger
               value="active"
-              className="text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-200"
+              className="text-xs sm:text-sm data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200"
             >
               Active
             </TabsTrigger>
             <TabsTrigger
               value="resolved"
-              className="text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-200"
+              className="text-xs sm:text-sm data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200"
             >
               Resolved
             </TabsTrigger>
