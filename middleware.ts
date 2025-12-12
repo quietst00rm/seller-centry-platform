@@ -71,11 +71,16 @@ function getRootDomain(request: NextRequest): string {
   return hostname;
 }
 
-// Routes that don't require authentication
+// Routes that don't require authentication AND should not be rewritten to /s/subdomain
+// These routes exist at the app root level, not under /s/[subdomain]
 const publicRoutes = ['/login', '/auth/callback', '/forgot-password'];
 
 // Routes that are API routes (handled separately)
 const isApiRoute = (pathname: string) => pathname.startsWith('/api');
+
+// Check if a path is a public/shared route that should NOT be rewritten
+const isPublicRoute = (pathname: string) =>
+  publicRoutes.some((route) => pathname.startsWith(route));
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -115,30 +120,32 @@ export async function middleware(request: NextRequest) {
 
   // Handle subdomain routes
   if (subdomain) {
-    // Check if it's a public route
-    const isPublicRoute = publicRoutes.some((route) =>
-      pathname.startsWith(route)
-    );
-
     // Allow API routes to handle their own auth
     if (isApiRoute(pathname)) {
       return supabaseResponse;
     }
 
-    // If not authenticated and not on a public route, redirect to login
-    if (!user && !isPublicRoute) {
+    // Public routes (login, auth callback, etc.) should NOT be rewritten
+    // They exist at the app root level and are shared across all subdomains
+    if (isPublicRoute(pathname)) {
+      // If authenticated and on login page, redirect to dashboard (root of subdomain)
+      if (user && pathname === '/login') {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+      // Otherwise, let the request through to the actual route (e.g., /login)
+      return supabaseResponse;
+    }
+
+    // For protected routes: if not authenticated, redirect to login
+    if (!user) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
+      console.log(`[Middleware] Not authenticated, redirecting to: ${loginUrl.pathname}`);
       return NextResponse.redirect(loginUrl);
     }
 
-    // If authenticated and on login page, redirect to dashboard
-    if (user && pathname === '/login') {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-
-    // Rewrite ALL subdomain requests to the subdomain route
-    // This handles /, /dashboard, /settings, etc.
+    // User is authenticated and accessing a protected route
+    // Rewrite to the subdomain-specific route (e.g., / -> /s/alwayz-on-sale)
     if (!pathname.startsWith('/s/')) {
       const rewriteUrl = new URL(`/s/${subdomain}${pathname}`, request.url);
       console.log(`[Middleware] Rewriting to: ${rewriteUrl.pathname}`);
