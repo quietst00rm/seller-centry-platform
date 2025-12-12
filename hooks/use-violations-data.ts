@@ -29,7 +29,7 @@ export function useViolationsData(): UseViolationsDataReturn {
       }
 
       const data = await response.json();
-      setViolations(data.violations || []);
+      setViolations(data.data?.violations || []);
       setLastSync(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch violations');
