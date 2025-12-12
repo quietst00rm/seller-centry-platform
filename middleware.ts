@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-// Production domain - hardcoded for reliability
-const PRODUCTION_DOMAIN = 'sellercentry.com';
+// Production domains - hardcoded for reliability
+const PRODUCTION_DOMAINS = [
+  'sellercentry.com',
+  'seller-centry-platform.vercel.app',
+];
 
 function extractSubdomain(request: NextRequest): string | null {
   const host = request.headers.get('host') || '';
@@ -23,12 +26,14 @@ function extractSubdomain(request: NextRequest): string | null {
     return null;
   }
 
-  // Production: sellercentry.com
-  if (hostname.endsWith(`.${PRODUCTION_DOMAIN}`)) {
-    const subdomain = hostname.replace(`.${PRODUCTION_DOMAIN}`, '');
-    // Make sure it's not www or empty
-    if (subdomain && subdomain !== 'www') {
-      return subdomain;
+  // Check each production domain
+  for (const domain of PRODUCTION_DOMAINS) {
+    if (hostname.endsWith(`.${domain}`)) {
+      const subdomain = hostname.replace(`.${domain}`, '');
+      // Make sure it's not www or empty
+      if (subdomain && subdomain !== 'www') {
+        return subdomain;
+      }
     }
   }
 
@@ -42,6 +47,30 @@ function extractSubdomain(request: NextRequest): string | null {
   return null;
 }
 
+function isWwwSubdomain(request: NextRequest): boolean {
+  const host = request.headers.get('host') || '';
+  const hostname = host.split(':')[0].toLowerCase();
+
+  for (const domain of PRODUCTION_DOMAINS) {
+    if (hostname === `www.${domain}`) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getRootDomain(request: NextRequest): string {
+  const host = request.headers.get('host') || '';
+  const hostname = host.split(':')[0].toLowerCase();
+
+  for (const domain of PRODUCTION_DOMAINS) {
+    if (hostname.endsWith(domain)) {
+      return domain;
+    }
+  }
+  return hostname;
+}
+
 // Routes that don't require authentication
 const publicRoutes = ['/login', '/auth/callback', '/forgot-password'];
 
@@ -50,7 +79,8 @@ const isApiRoute = (pathname: string) => pathname.startsWith('/api');
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const subdomain = extractSubdomain(request);
+  const host = request.headers.get('host') || '';
+  const hostname = host.split(':')[0].toLowerCase();
 
   // Skip middleware for static files and Next.js internals
   if (
@@ -60,6 +90,20 @@ export async function middleware(request: NextRequest) {
   ) {
     return NextResponse.next();
   }
+
+  // Redirect www to root domain
+  if (isWwwSubdomain(request)) {
+    const rootDomain = getRootDomain(request);
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const redirectUrl = `${protocol}://${rootDomain}${pathname}`;
+    return NextResponse.redirect(redirectUrl, { status: 301 });
+  }
+
+  // Extract subdomain
+  const subdomain = extractSubdomain(request);
+
+  // Debug logging (will show in Vercel function logs)
+  console.log(`[Middleware] Host: ${hostname}, Subdomain: ${subdomain}, Path: ${pathname}`);
 
   // Update Supabase session
   const { supabaseResponse, user } = await updateSession(request);
@@ -93,16 +137,18 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Rewrite subdomain requests to the subdomain route
-    if (pathname === '/' || pathname === '') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}`, request.url),
-        { headers: supabaseResponse.headers }
-      );
+    // Rewrite ALL subdomain requests to the subdomain route
+    // This handles /, /dashboard, /settings, etc.
+    if (!pathname.startsWith('/s/')) {
+      const rewriteUrl = new URL(`/s/${subdomain}${pathname}`, request.url);
+      console.log(`[Middleware] Rewriting to: ${rewriteUrl.pathname}`);
+      return NextResponse.rewrite(rewriteUrl, {
+        headers: supabaseResponse.headers,
+      });
     }
   }
 
-  // On root domain without subdomain (main site)
+  // On root domain without subdomain (main site - landing page)
   return supabaseResponse;
 }
 
@@ -110,10 +156,9 @@ export const config = {
   matcher: [
     /*
      * Match all paths except for:
-     * 1. /api routes (handled separately)
-     * 2. /_next (Next.js internals)
-     * 3. all root files inside /public (e.g. /favicon.ico)
+     * 1. /_next (Next.js internals)
+     * 2. Static files (svg, png, jpg, etc.)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
