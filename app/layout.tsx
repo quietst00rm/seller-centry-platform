@@ -17,6 +17,15 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: 'Seller Centry Dashboard',
   description: 'Amazon Seller Account Health & Violation Tracking',
+  manifest: '/images/favicons/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/images/favicons/favicon.ico' },
+      { url: '/images/favicons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/images/favicons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/images/favicons/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {
