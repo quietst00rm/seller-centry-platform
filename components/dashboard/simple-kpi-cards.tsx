@@ -18,12 +18,12 @@ export function SimpleKPICards({ openViolations, atRiskSales }: SimpleKPICardsPr
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
       {/* Open Violations Card */}
       <div className={cn(
-        'relative bg-card rounded-2xl border border-border/50',
-        'border-l-4 border-l-warning p-6 md:p-8',
-        'shadow-card',
-        'transition-all duration-300 ease-out',
-        'hover:shadow-card-hover hover:-translate-y-1',
-        'group cursor-default'
+        "relative bg-card rounded-2xl border border-border/50",
+        "border-l-4 border-l-warning p-6 md:p-8",
+        "shadow-[var(--shadow-elevated)]",
+        "transition-all duration-300 ease-out",
+        "hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1",
+        "group cursor-default"
       )}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -51,12 +51,12 @@ export function SimpleKPICards({ openViolations, atRiskSales }: SimpleKPICardsPr
 
       {/* At-Risk Sales Card */}
       <div className={cn(
-        'relative bg-card rounded-2xl border border-border/50',
-        'border-l-4 border-l-primary p-6 md:p-8',
-        'shadow-card',
-        'transition-all duration-300 ease-out',
-        'hover:shadow-card-hover hover:-translate-y-1',
-        'group cursor-default'
+        "relative bg-card rounded-2xl border border-border/50",
+        "border-l-4 border-l-primary p-6 md:p-8",
+        "shadow-[var(--shadow-elevated)]",
+        "transition-all duration-300 ease-out",
+        "hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1",
+        "group cursor-default"
       )}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">

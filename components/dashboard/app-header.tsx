@@ -154,7 +154,7 @@ export function AppHeader({
           {/* Left: Logo */}
           <div className="flex items-center">
             <Image
-              src="/logos/Logo transparent.png"
+              src="/logos/seller-centry-logo.png"
               alt="Seller Centry"
               width={160}
               height={40}
