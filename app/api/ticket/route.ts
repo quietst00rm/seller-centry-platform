@@ -137,9 +137,9 @@ ${storeName}.sellercentry.com
     });
 
     if (error) {
-      console.error('Resend error:', error);
+      console.error('Resend error:', JSON.stringify(error, null, 2));
       return NextResponse.json(
-        { success: false, error: 'Failed to send email' },
+        { success: false, error: `Failed to send email: ${error.message || 'Unknown error'}` },
         { status: 500 }
       );
     }
