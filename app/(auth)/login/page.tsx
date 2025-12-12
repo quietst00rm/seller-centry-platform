@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { signInWithEmail, signInWithGoogle } from '../actions';
 import { Button } from '@/components/ui/button';
@@ -44,8 +45,15 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary">Seller Centry</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <Image
+            src="/logos/seller-centry-logo.png"
+            alt="Seller Centry"
+            width={220}
+            height={55}
+            className="mx-auto h-12 sm:h-14 w-auto object-contain mb-4"
+            priority
+          />
+          <p className="text-sm text-muted-foreground">
             Sign in to your dashboard
           </p>
         </div>
