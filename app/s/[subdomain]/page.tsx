@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import { DashboardClient } from '@/components/dashboard/dashboard-client';
+import { LovableDashboardClient } from '@/components/dashboard/lovable-dashboard-client';
 
 export async function generateMetadata({
   params,
@@ -38,5 +38,5 @@ export default async function SubdomainDashboard({
     );
   }
 
-  return <DashboardClient subdomain={subdomain} user={user} />;
+  return <LovableDashboardClient subdomain={subdomain} user={user} />;
 }

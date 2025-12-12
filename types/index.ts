@@ -23,7 +23,7 @@ export interface Violation {
   productTitle: string;        // Column F
   atRiskSales: number;         // Column G - Dollar amount
   actionTaken: string;         // Column H - e.g., "Listing removed"
-  ahrImpact: 'High' | 'Low' | 'No impact'; // Column I
+  ahrImpact: 'High' | 'Medium' | 'Low' | 'No impact'; // Column I
   nextSteps: string;           // Column J
   options: string;             // Column K
   status: ViolationStatus;     // Column L
@@ -37,7 +37,8 @@ export type ViolationStatus =
   | 'Submitted'
   | 'Denied'
   | 'Ignored'
-  | 'Resolved';
+  | 'Resolved'
+  | 'Acknowledged';
 
 export type ViolationTab = 'active' | 'resolved';
 
