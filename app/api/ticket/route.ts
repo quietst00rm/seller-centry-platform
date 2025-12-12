@@ -128,7 +128,7 @@ ${storeName}.sellercentry.com
     // Send email via Resend
     const resend = getResendClient();
     const { error } = await resend.emails.send({
-      from: 'Seller Centry <tickets@sellercentry.com>',
+      from: 'Seller Centry <tickets@notifications.sellercentry.com>',
       to: TICKET_RECIPIENTS,
       replyTo: userEmail,
       subject: emailSubject,
