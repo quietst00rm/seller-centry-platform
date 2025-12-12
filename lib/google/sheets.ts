@@ -48,13 +48,20 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
       return null;
     }
 
-    // Find the row matching the subdomain (Column A = StoreName)
+    // Build expected subdomain URL for matching against Column L
+    const expectedSubdomainUrl = `${subdomain}.sellercentry.com`;
+    const subdomainLower = subdomain.toLowerCase();
+
+    // Find the row matching the subdomain
+    // Primary: Column L (row[11]) contains full subdomain URL like "alpha-daily-deals.sellercentry.com"
+    // Fallback: Column A (row[0]) matches subdomain for backwards compatibility
     // Skip header row (index 0)
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      const storeName = (row[0] || '').toString().toLowerCase();
+      const columnL = (row[11] || '').toString().toLowerCase();
+      const columnA = (row[0] || '').toString().toLowerCase();
 
-      if (storeName === subdomain.toLowerCase()) {
+      if (columnL === expectedSubdomainUrl || columnA === subdomainLower) {
         return {
           storeName: row[0] || '',
           merchantId: row[1] || '',
@@ -66,7 +73,7 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
           atRiskSales: parseFloat(row[7]?.replace(/[$,]/g, '')) || 0,
           highImpactCount: parseInt(row[8]) || 0,
           resolvedCount: parseInt(row[9]) || 0,
-          subdomain: row[11] || `${storeName}.sellercentry.com`,
+          subdomain: row[11] || `${columnA}.sellercentry.com`,
         };
       }
     }
