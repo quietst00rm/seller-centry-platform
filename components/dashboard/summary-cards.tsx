@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, DollarSign, TrendingUp, CheckCircle } from 'lucide-react';
+import { AlertTriangle, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -15,67 +15,47 @@ interface SummaryCardsProps {
 export function SummaryCards({
   totalViolations,
   atRiskSales,
-  highImpactCount,
-  resolvedCount,
   isLoading,
 }: SummaryCardsProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-3 p-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-24 rounded-lg" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-4 py-4">
+        {[1, 2].map((i) => (
+          <Skeleton key={i} className="h-28 rounded-lg" />
         ))}
       </div>
     );
   }
 
-  const cards = [
-    {
-      label: 'Open Violations',
-      value: totalViolations.toString(),
-      icon: AlertTriangle,
-      iconColor: 'text-primary',
-      bgColor: 'bg-primary/10',
-    },
-    {
-      label: 'At-Risk Sales',
-      value: formatCurrency(atRiskSales),
-      icon: DollarSign,
-      iconColor: 'text-green-400',
-      bgColor: 'bg-green-500/10',
-    },
-    {
-      label: 'High Impact',
-      value: highImpactCount.toString(),
-      icon: TrendingUp,
-      iconColor: 'text-red-400',
-      bgColor: 'bg-red-500/10',
-    },
-    {
-      label: 'Resolved',
-      value: resolvedCount.toString(),
-      icon: CheckCircle,
-      iconColor: 'text-emerald-400',
-      bgColor: 'bg-emerald-500/10',
-    },
-  ];
-
   return (
-    <div className="grid grid-cols-2 gap-3 p-4">
-      {cards.map((card) => (
-        <div
-          key={card.label}
-          className="bg-card border border-border rounded-lg p-4"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div className={`p-1.5 rounded-md ${card.bgColor}`}>
-              <card.icon className={`h-4 w-4 ${card.iconColor}`} />
-            </div>
-          </div>
-          <p className="text-2xl font-bold">{card.value}</p>
-          <p className="text-xs text-muted-foreground">{card.label}</p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-4 py-4">
+      {/* Open Violations Card */}
+      <div className="bg-[#1a1a1a] rounded-lg p-6 border-l-4 border-orange-500 flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-[#9ca3af] mb-1">
+            Open Violations
+          </p>
+          <p className="text-3xl font-bold text-white">{totalViolations}</p>
+          <p className="text-sm text-[#6b7280] mt-1">Active issues</p>
         </div>
-      ))}
+        <div className="bg-orange-500/20 rounded-full p-3">
+          <AlertTriangle className="h-6 w-6 text-orange-500" />
+        </div>
+      </div>
+
+      {/* At-Risk Sales Card */}
+      <div className="bg-[#1a1a1a] rounded-lg p-6 border-l-4 border-orange-500 flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-[#9ca3af] mb-1">
+            At-Risk Sales
+          </p>
+          <p className="text-3xl font-bold text-white">{formatCurrency(atRiskSales)}</p>
+          <p className="text-sm text-[#6b7280] mt-1">Potential revenue impact</p>
+        </div>
+        <div className="bg-orange-500/20 rounded-full p-3">
+          <DollarSign className="h-6 w-6 text-orange-500" />
+        </div>
+      </div>
     </div>
   );
 }

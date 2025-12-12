@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Violation, ViolationStatus } from '@/types';
 
@@ -10,69 +9,89 @@ interface ViolationCardProps {
   onClick: () => void;
 }
 
-const statusVariantMap: Record<ViolationStatus, 'working' | 'waiting' | 'submitted' | 'denied' | 'resolved' | 'ignored'> = {
-  'Working': 'working',
-  'Waiting on Client': 'waiting',
-  'Submitted': 'submitted',
-  'Denied': 'denied',
-  'Resolved': 'resolved',
-  'Ignored': 'ignored',
+// Status badge styling
+const getStatusBadgeClass = (status: ViolationStatus): string => {
+  const baseClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium';
+  switch (status) {
+    case 'Working':
+      return `${baseClass} bg-cyan-500/20 text-cyan-400`;
+    case 'Waiting on Client':
+      return `${baseClass} bg-yellow-500/20 text-yellow-400`;
+    case 'Submitted':
+      return `${baseClass} bg-purple-500/20 text-purple-400`;
+    case 'Denied':
+      return `${baseClass} bg-red-500/20 text-red-400`;
+    case 'Resolved':
+      return `${baseClass} bg-green-500/20 text-green-400`;
+    case 'Ignored':
+      return `${baseClass} bg-gray-500/20 text-gray-400`;
+    default:
+      return `${baseClass} bg-gray-500/20 text-gray-400`;
+  }
 };
 
-const impactVariantMap: Record<string, 'high' | 'low' | 'none'> = {
-  'High': 'high',
-  'Low': 'low',
-  'No impact': 'none',
+// Impact badge styling
+const getImpactBadgeClass = (impact: string): string => {
+  const baseClass = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium';
+  switch (impact) {
+    case 'High':
+      return `${baseClass} bg-red-500/20 text-red-400`;
+    case 'Low':
+      return `${baseClass} bg-yellow-500/20 text-yellow-400`;
+    default:
+      return `${baseClass} bg-gray-500/20 text-gray-500`;
+  }
 };
 
 export function ViolationCard({ violation, onClick }: ViolationCardProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-card border border-border rounded-lg p-4 touch-target active:bg-accent transition-colors"
+      className="w-full text-left bg-gray-800/50 rounded-lg border-l-4 border-orange-500 p-4 min-h-[100px] active:bg-gray-700/50 transition-colors"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          {/* Product Title */}
-          <p className="font-medium text-sm line-clamp-2 mb-1">
+          {/* Top row: Issue type + Status badge */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-sm font-semibold text-white truncate">
+              {violation.reason}
+            </span>
+            <span className={getStatusBadgeClass(violation.status)}>
+              {violation.status}
+            </span>
+          </div>
+
+          {/* Middle: Product title (2 lines max) + ASIN */}
+          <p className="text-sm text-[#9ca3af] line-clamp-2 mb-1">
             {violation.productTitle || 'Unknown Product'}
           </p>
+          <p className="text-xs font-mono text-[#6b7280] mb-3">
+            {violation.asin}
+          </p>
 
-          {/* ASIN and Issue Type */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-            <span className="font-mono">{violation.asin}</span>
-            <span>•</span>
-            <span className="truncate">{violation.reason}</span>
-          </div>
-
-          {/* Badges row */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={statusVariantMap[violation.status]}>
-              {violation.status}
-            </Badge>
-            <Badge variant={impactVariantMap[violation.ahrImpact]}>
-              {violation.ahrImpact}
-            </Badge>
-            {violation.atRiskSales > 0 && (
-              <span className="text-xs text-green-400 font-medium">
+          {/* Bottom row: At-Risk + Impact + Date */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${violation.atRiskSales > 0 ? 'text-orange-400' : 'text-[#6b7280]'}`}>
                 {formatCurrency(violation.atRiskSales)}
               </span>
-            )}
+              <span className={getImpactBadgeClass(violation.ahrImpact)}>
+                {violation.ahrImpact}
+              </span>
+            </div>
+            <span className="text-xs text-[#6b7280]">
+              {formatDate(violation.date)}
+            </span>
           </div>
-
-          {/* Date */}
-          <p className="text-xs text-muted-foreground mt-2">
-            Opened {formatDate(violation.date)}
-          </p>
         </div>
 
-        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-1" />
+        <ChevronRight className="h-5 w-5 text-[#6b7280] flex-shrink-0 mt-1" />
       </div>
 
       {/* Notes indicator */}
       {violation.notes && (
-        <div className="mt-3 pt-3 border-t border-border">
-          <p className="text-xs text-yellow-400 line-clamp-1">
+        <div className="mt-3 pt-3 border-t border-gray-700/50">
+          <p className="text-xs text-orange-400 line-clamp-1">
             Note: {violation.notes}
           </p>
         </div>

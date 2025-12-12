@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, X } from 'lucide-react';
+import { MessageSquare, AlertTriangle, X } from 'lucide-react';
 import type { Violation } from '@/types';
 
 interface AttentionBannerProps {
@@ -20,44 +20,56 @@ export function AttentionBanner({ violations, onViewViolation }: AttentionBanner
   }
 
   return (
-    <div className="mx-4 mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-100">
-              {needsAttention.length} violation{needsAttention.length !== 1 ? 's' : ''} need{needsAttention.length === 1 ? 's' : ''} your attention
-            </p>
-            <p className="text-xs text-yellow-200/70 mt-1">
-              These violations have notes from your account manager.
-            </p>
+    <div className="mx-4 mb-4">
+      <div className="bg-gradient-to-r from-amber-900/40 to-amber-900/10 rounded-lg border-l-4 border-orange-500 p-4">
+        <div className="flex items-center justify-between gap-4">
+          {/* Left icon */}
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="bg-orange-500/20 rounded-full p-2.5 flex-shrink-0">
+              <MessageSquare className="h-5 w-5 text-orange-500" />
+            </div>
+
+            {/* Text content */}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white">
+                {needsAttention.length} violation{needsAttention.length !== 1 ? 's' : ''} need{needsAttention.length === 1 ? 's' : ''} your attention
+              </p>
+              <p className="text-xs text-[#9ca3af] mt-0.5">
+                We&apos;ve added notes requiring your review
+              </p>
+            </div>
+          </div>
+
+          {/* Right side: warning icon and close */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            <button
+              onClick={() => setIsDismissed(true)}
+              className="p-1.5 text-[#6b7280] hover:text-white transition-colors rounded-full hover:bg-white/10"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
-        <button
-          onClick={() => setIsDismissed(true)}
-          className="p-1 text-yellow-400/70 hover:text-yellow-400 transition-colors"
-          aria-label="Dismiss"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
 
-      {/* Quick links to violations with notes */}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {needsAttention.slice(0, 3).map((violation) => (
-          <button
-            key={violation.id}
-            onClick={() => onViewViolation(violation)}
-            className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-100 px-2 py-1 rounded transition-colors"
-          >
-            {violation.asin}
-          </button>
-        ))}
-        {needsAttention.length > 3 && (
-          <span className="text-xs text-yellow-200/70 px-2 py-1">
-            +{needsAttention.length - 3} more
-          </span>
-        )}
+        {/* Quick links to violations with notes */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {needsAttention.slice(0, 3).map((violation) => (
+            <button
+              key={violation.id}
+              onClick={() => onViewViolation(violation)}
+              className="text-xs bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 px-3 py-1.5 rounded-full transition-colors font-medium"
+            >
+              {violation.asin}
+            </button>
+          ))}
+          {needsAttention.length > 3 && (
+            <span className="text-xs text-[#6b7280] px-3 py-1.5">
+              +{needsAttention.length - 3} more
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
