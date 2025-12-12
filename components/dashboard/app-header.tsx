@@ -72,6 +72,19 @@ export function AppHeader({
   const [ticketMessage, setTicketMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Fetch user email on mount
+  useEffect(() => {
+    const fetchUserEmail = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    };
+    fetchUserEmail();
+  }, []);
 
   // Use external control if provided, otherwise use internal state
   const ticketModalOpen = externalTicketModalOpen !== undefined ? externalTicketModalOpen : internalTicketModalOpen;
@@ -112,6 +125,15 @@ export function AppHeader({
       return;
     }
 
+    if (!userEmail) {
+      toast({
+        title: 'Error',
+        description: 'Unable to get user email. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmittingTicket(true);
 
     try {
@@ -123,6 +145,7 @@ export function AppHeader({
           subject: ticketSubject,
           asin: ticketAsin,
           message: ticketMessage,
+          userEmail,
         }),
       });
 
