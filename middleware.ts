@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
-import { rootDomain } from '@/lib/utils';
+
+// Production domain - hardcoded for reliability
+const PRODUCTION_DOMAIN = 'sellercentry.com';
 
 function extractSubdomain(request: NextRequest): string | null {
-  const url = request.url;
   const host = request.headers.get('host') || '';
-  const hostname = host.split(':')[0];
+  const hostname = host.split(':')[0].toLowerCase();
 
   // Local development: check query param first (localhost:3000?tenant=alwayz-on-sale)
   const searchParams = request.nextUrl.searchParams;
@@ -15,21 +16,21 @@ function extractSubdomain(request: NextRequest): string | null {
   }
 
   // Local development: subdomain style (alwayz-on-sale.localhost:3000)
-  if (url.includes('localhost') || url.includes('127.0.0.1')) {
-    const fullUrlMatch = url.match(/http:\/\/([^.]+)\.localhost/);
-    if (fullUrlMatch && fullUrlMatch[1]) {
-      return fullUrlMatch[1];
-    }
-
+  if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
     if (hostname.includes('.localhost')) {
       return hostname.split('.')[0];
     }
-
     return null;
   }
 
-  // Production environment
-  const rootDomainFormatted = rootDomain.split(':')[0];
+  // Production: sellercentry.com
+  if (hostname.endsWith(`.${PRODUCTION_DOMAIN}`)) {
+    const subdomain = hostname.replace(`.${PRODUCTION_DOMAIN}`, '');
+    // Make sure it's not www or empty
+    if (subdomain && subdomain !== 'www') {
+      return subdomain;
+    }
+  }
 
   // Handle preview deployment URLs (tenant---branch-name.vercel.app)
   if (hostname.includes('---') && hostname.endsWith('.vercel.app')) {
@@ -37,13 +38,8 @@ function extractSubdomain(request: NextRequest): string | null {
     return parts.length > 0 ? parts[0] : null;
   }
 
-  // Regular subdomain detection
-  const isSubdomain =
-    hostname !== rootDomainFormatted &&
-    hostname !== `www.${rootDomainFormatted}` &&
-    hostname.endsWith(`.${rootDomainFormatted}`);
-
-  return isSubdomain ? hostname.replace(`.${rootDomainFormatted}`, '') : null;
+  // No subdomain detected (root domain or www)
+  return null;
 }
 
 // Routes that don't require authentication
