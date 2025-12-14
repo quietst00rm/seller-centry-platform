@@ -124,24 +124,40 @@ export async function getViolations(
     // Determine which tab to read from
     const tabName = tab === 'active' ? 'All Current Violations' : 'All Resolved Violations';
 
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${tabName}'!A:N`,
-    });
+    console.log(`[getViolations] Fetching ${tab} violations for ${tenant.storeName}`);
+    console.log(`[getViolations] Tab name: "${tabName}", Sheet ID: ${sheetId}`);
+
+    let response;
+    try {
+      response = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `'${tabName}'!A:N`,
+      });
+    } catch (apiError) {
+      console.error(`[getViolations] Google Sheets API error for tab "${tabName}":`, apiError);
+      throw apiError;
+    }
 
     const rows = response.data.values;
+    console.log(`[getViolations] Raw rows returned: ${rows?.length ?? 0}`);
+
     if (!rows || rows.length < 2) {
+      console.log(`[getViolations] No data rows found (rows.length=${rows?.length})`);
       return [];
     }
 
     // Skip header row and map data
     const violations: Violation[] = [];
 
+    let skippedRows = 0;
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
 
-      // Skip empty rows
-      if (!row[0] && !row[4]) continue;
+      // Skip empty rows (rows without Violation ID AND without ASIN)
+      if (!row || (!row[0] && !row[4])) {
+        skippedRows++;
+        continue;
+      }
 
       const violation: Violation = {
         id: row[0] || `gen-${i}`,
@@ -161,6 +177,16 @@ export async function getViolations(
       };
 
       violations.push(violation);
+    }
+
+    console.log(`[getViolations] Parsed ${violations.length} violations from ${rows.length - 1} data rows (${skippedRows} empty rows skipped)`);
+
+    // Log first violation for debugging if we have data
+    if (violations.length > 0) {
+      console.log(`[getViolations] First violation sample:`, JSON.stringify(violations[0], null, 2));
+    } else if (rows.length > 1) {
+      // We had data rows but all were filtered - log first data row for debugging
+      console.log(`[getViolations] WARNING: All ${rows.length - 1} data rows were skipped. First row sample:`, JSON.stringify(rows[1]));
     }
 
     return violations;
