@@ -78,8 +78,6 @@ export function useDashboardData({ subdomain }: UseDashboardDataOptions) {
         search: filters.search,
       });
 
-      console.log(`[fetchViolations] Fetching with tab="${currentTab}", URL: /api/violations?${params}`);
-
       const response = await fetch(`/api/violations?${params}`);
       const data = await response.json();
 
@@ -120,7 +118,6 @@ export function useDashboardData({ subdomain }: UseDashboardDataOptions) {
 
   // Fetch violations when filters change - explicitly watch tab and pass it as parameter
   useEffect(() => {
-    console.log(`[useEffect] Tab changed to "${filters.tab}", triggering fetch`);
     fetchViolations(filters.tab);
   }, [fetchViolations, filters.tab]);
 
