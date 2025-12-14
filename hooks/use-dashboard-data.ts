@@ -65,20 +65,20 @@ export function useDashboardData({ subdomain }: UseDashboardDataOptions) {
     }
   }, [subdomain]);
 
-  // Fetch violations
-  const fetchViolations = useCallback(async () => {
+  // Fetch violations - takes tab as parameter to ensure correct value is used
+  const fetchViolations = useCallback(async (currentTab: ViolationTab) => {
     setState((prev) => ({ ...prev, isLoadingViolations: true }));
 
     try {
       const params = new URLSearchParams({
         subdomain,
-        tab: filters.tab,
+        tab: currentTab,
         time: filters.timeFilter,
         status: filters.statusFilter,
         search: filters.search,
       });
 
-      console.log(`[fetchViolations] Fetching with tab="${filters.tab}", URL: /api/violations?${params}`);
+      console.log(`[fetchViolations] Fetching with tab="${currentTab}", URL: /api/violations?${params}`);
 
       const response = await fetch(`/api/violations?${params}`);
       const data = await response.json();
@@ -101,7 +101,7 @@ export function useDashboardData({ subdomain }: UseDashboardDataOptions) {
         error: err instanceof Error ? err.message : 'Failed to fetch violations',
       }));
     }
-  }, [subdomain, filters.tab, filters.timeFilter, filters.statusFilter, filters.search]);
+  }, [subdomain, filters.timeFilter, filters.statusFilter, filters.search]);
 
   // Refresh all data
   const refresh = useCallback(async () => {
@@ -110,18 +110,19 @@ export function useDashboardData({ subdomain }: UseDashboardDataOptions) {
       isLoadingTenant: true,
       isLoadingViolations: true,
     }));
-    await Promise.all([fetchTenant(), fetchViolations()]);
-  }, [fetchTenant, fetchViolations]);
+    await Promise.all([fetchTenant(), fetchViolations(filters.tab)]);
+  }, [fetchTenant, fetchViolations, filters.tab]);
 
   // Initial fetch
   useEffect(() => {
     fetchTenant();
   }, [fetchTenant]);
 
-  // Fetch violations when filters change
+  // Fetch violations when filters change - explicitly watch tab and pass it as parameter
   useEffect(() => {
-    fetchViolations();
-  }, [fetchViolations]);
+    console.log(`[useEffect] Tab changed to "${filters.tab}", triggering fetch`);
+    fetchViolations(filters.tab);
+  }, [fetchViolations, filters.tab]);
 
   // Filter setters
   const setTab = (tab: ViolationTab) => {
