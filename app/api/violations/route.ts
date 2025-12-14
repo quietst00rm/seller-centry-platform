@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
     const status = (searchParams.get('status') || 'all') as ViolationStatus | 'all';
     const search = searchParams.get('search') || '';
 
+    // Debug: log full URL and tab param to diagnose query string issue
+    console.log(`[violations API] URL: ${request.nextUrl.toString()}, tab param: ${searchParams.get('tab')}`);
+
     if (!subdomain) {
       return NextResponse.json<ViolationsResponse>(
         { success: false, error: 'Subdomain is required' },
