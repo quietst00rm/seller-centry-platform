@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Violation } from '@/types';
+import type { Violation, ViolationTab } from '@/types';
+
+interface UseViolationsDataOptions {
+  tab?: ViolationTab;
+}
 
 interface UseViolationsDataReturn {
   violations: Violation[];
@@ -11,7 +15,8 @@ interface UseViolationsDataReturn {
   refetch: () => Promise<void>;
 }
 
-export function useViolationsData(): UseViolationsDataReturn {
+export function useViolationsData(options: UseViolationsDataOptions = {}): UseViolationsDataReturn {
+  const { tab = 'active' } = options;
   const [violations, setViolations] = useState<Violation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +27,8 @@ export function useViolationsData(): UseViolationsDataReturn {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/violations');
+      const params = new URLSearchParams({ tab });
+      const response = await fetch(`/api/violations?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch violations');
@@ -37,7 +43,7 @@ export function useViolationsData(): UseViolationsDataReturn {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tab]);
 
   // Initial fetch
   useEffect(() => {
