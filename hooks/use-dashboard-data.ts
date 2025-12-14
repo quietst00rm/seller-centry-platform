@@ -78,6 +78,8 @@ export function useDashboardData({ subdomain }: UseDashboardDataOptions) {
         search: filters.search,
       });
 
+      console.log(`[fetchViolations] Fetching with tab="${filters.tab}", URL: /api/violations?${params}`);
+
       const response = await fetch(`/api/violations?${params}`);
       const data = await response.json();
 
