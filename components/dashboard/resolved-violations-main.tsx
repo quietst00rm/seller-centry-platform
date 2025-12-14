@@ -18,7 +18,7 @@ interface FilterState {
 }
 
 export function ResolvedViolationsMain({ onViewCase }: ResolvedViolationsMainProps) {
-  const { violations, loading } = useViolationsData();
+  const { violations, loading } = useViolationsData({ tab: 'resolved' });
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'Last 30 Days',
     statuses: [],
