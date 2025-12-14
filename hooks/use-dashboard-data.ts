@@ -78,7 +78,10 @@ export function useDashboardData({ subdomain }: UseDashboardDataOptions) {
         search: filters.search,
       });
 
-      const response = await fetch(`/api/violations?${params}`);
+      const url = `/api/violations?${params.toString()}`;
+      console.log('[fetchViolations] Calling:', url);
+
+      const response = await fetch(url);
       const data = await response.json();
 
       if (!data.success) {
