@@ -19,6 +19,8 @@ function SetupPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const initRef = useRef(false);
   const tokensRef = useRef<{ access: string | null; refresh: string | null }>({ access: null, refresh: null });
 
@@ -46,12 +48,19 @@ function SetupPasswordContent() {
     const accessToken = tokensRef.current.access;
     const refreshToken = tokensRef.current.refresh;
 
-    const setValidSession = () => {
+    const setValidSession = async () => {
       if (mounted && isValidSession !== true) {
         // Clear hash from URL
         if (window.location.hash) {
           window.history.replaceState(null, '', window.location.pathname);
         }
+
+        // Get user email for later subdomain lookup
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          setUserEmail(user.email);
+        }
+
         setIsValidSession(true);
         if (timeoutId) clearTimeout(timeoutId);
       }
@@ -92,7 +101,7 @@ function SetupPasswordContent() {
             return;
           }
           // If setSession fails, continue to timeout
-        } catch (e) {
+        } catch {
           // Continue to timeout
         }
       }
@@ -139,6 +148,25 @@ function SetupPasswordContent() {
 
     try {
       const supabase = createClient();
+
+      // Look up subdomain BEFORE updating password and signing out
+      // (API requires authentication)
+      let targetUrl = '/login';
+      if (userEmail) {
+        try {
+          const response = await fetch(`/api/user-subdomain?email=${encodeURIComponent(userEmail)}`);
+          const data = await response.json();
+
+          if (data.success && data.data?.primarySubdomain) {
+            const subdomain = data.data.primarySubdomain;
+            targetUrl = `https://${subdomain}.sellercentry.com/login`;
+          }
+        } catch {
+          // Keep default /login
+        }
+      }
+      setRedirectUrl(targetUrl);
+
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
       });
@@ -146,15 +174,24 @@ function SetupPasswordContent() {
       if (updateError) {
         setError(updateError.message);
         setLoading(false);
+        setRedirectUrl(null);
         return;
       }
 
       // Sign out after setting password so they can log in fresh
       await supabase.auth.signOut();
       setSuccess(true);
+
+      // Auto-redirect after 2 seconds if we have a subdomain URL
+      if (targetUrl !== '/login') {
+        setTimeout(() => {
+          window.location.href = targetUrl;
+        }, 2000);
+      }
     } catch {
       setError('An unexpected error occurred. Please try again.');
       setLoading(false);
+      setRedirectUrl(null);
     }
   };
 
@@ -217,15 +254,24 @@ function SetupPasswordContent() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-white">Password Set Successfully!</h1>
             <p className="text-muted-foreground">
-              You can now log in to your dashboard.
+              {redirectUrl && redirectUrl !== '/login'
+                ? 'Redirecting you to your dashboard login...'
+                : 'You can now log in to your dashboard.'}
             </p>
           </div>
-          <Button
-            onClick={() => router.push('/login')}
-            className="w-full touch-target"
-          >
-            Go to Login
-          </Button>
+          {redirectUrl ? (
+            <Button
+              onClick={() => window.location.href = redirectUrl}
+              className="w-full touch-target"
+            >
+              {redirectUrl === '/login' ? 'Go to Login' : 'Go to Your Dashboard'}
+            </Button>
+          ) : (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Finding your dashboard...</span>
+            </div>
+          )}
         </div>
       </div>
     );
