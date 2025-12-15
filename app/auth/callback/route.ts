@@ -17,6 +17,11 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/reset-password`);
       }
 
+      // Handle invite - redirect to password setup
+      if (type === 'invite') {
+        return NextResponse.redirect(`${origin}/auth/setup-password`);
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     }
   }
