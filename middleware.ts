@@ -73,7 +73,7 @@ function getRootDomain(request: NextRequest): string {
 
 // Routes that don't require authentication AND should not be rewritten to /s/subdomain
 // These routes exist at the app root level, not under /s/[subdomain]
-const publicRoutes = ['/login', '/auth/callback', '/forgot-password'];
+const publicRoutes = ['/login', '/auth/callback', '/forgot-password', '/unauthorized'];
 
 // Routes that are API routes (handled separately)
 const isApiRoute = (pathname: string) => pathname.startsWith('/api');
