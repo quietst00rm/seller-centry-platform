@@ -149,19 +149,31 @@ function SetupPasswordContent() {
     try {
       const supabase = createClient();
 
-      // Look up subdomain BEFORE updating password and signing out
-      // (API requires authentication)
-      let targetUrl = '/login';
-      if (userEmail) {
+      // Get email for subdomain lookup - use state or fetch directly as backup
+      let emailForLookup = userEmail;
+      if (!emailForLookup) {
         try {
-          const response = await fetch(`/api/user-subdomain?email=${encodeURIComponent(userEmail)}`);
+          const { data: { user } } = await supabase.auth.getUser();
+          emailForLookup = user?.email || null;
+        } catch {
+          // Continue without email
+        }
+      }
+
+      // Look up subdomain BEFORE updating password and signing out
+      // API allows unauthenticated access when email is provided directly
+      let targetUrl = '/login';
+      if (emailForLookup) {
+        try {
+          const response = await fetch(`/api/user-subdomain?email=${encodeURIComponent(emailForLookup)}`);
           const data = await response.json();
 
           if (data.success && data.data?.primarySubdomain) {
             const subdomain = data.data.primarySubdomain;
             targetUrl = `https://${subdomain}.sellercentry.com/login`;
           }
-        } catch {
+        } catch (fetchError) {
+          console.error('Failed to fetch subdomain:', fetchError);
           // Keep default /login
         }
       }
