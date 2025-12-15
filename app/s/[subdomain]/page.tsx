@@ -48,11 +48,18 @@ export default async function SubdomainDashboard({
     redirect('/unauthorized?reason=tenant_not_found');
   }
 
+  // Admin bypass - admins can access any subdomain
+  const adminEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean);
+
   const userEmail = user.email?.toLowerCase();
   const tenantEmail = tenant.email?.toLowerCase();
+  const isAdmin = adminEmails.includes(userEmail || '');
 
-  // Check if user's email matches the tenant's authorized email
-  if (!userEmail || !tenantEmail || userEmail !== tenantEmail) {
+  // Allow access if admin OR email matches subdomain's authorized email
+  if (!isAdmin && (!userEmail || !tenantEmail || userEmail !== tenantEmail)) {
     redirect('/unauthorized?reason=email_mismatch');
   }
 
