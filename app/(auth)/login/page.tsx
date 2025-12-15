@@ -22,10 +22,15 @@ export default function LoginPage() {
     formData.append('redirect', redirectTo);
 
     const result = await signInWithEmail(formData);
+
     if (result?.error) {
       setError(result.error);
       setLoading(false);
+    } else if (result?.redirectUrl) {
+      // Cross-domain redirect - use window.location for external URLs
+      window.location.href = result.redirectUrl;
     }
+    // If no error and no redirectUrl, the server action handled the redirect
   }
 
   return (

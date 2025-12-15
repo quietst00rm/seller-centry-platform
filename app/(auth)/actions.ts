@@ -43,10 +43,11 @@ export async function signInWithEmail(formData: FormData) {
       const subdomains = await getSubdomainsByEmail(email);
 
       if (subdomains.length > 0) {
-        // Redirect to the user's primary subdomain
+        // Return the subdomain URL for client-side redirect (cross-domain)
+        // Next.js redirect() doesn't work for external URLs
         const primarySubdomain = subdomains[0];
         const targetUrl = `https://${primarySubdomain}.sellercentry.com${redirectTo || '/'}`;
-        redirect(targetUrl);
+        return { redirectUrl: targetUrl };
       }
     } catch (err) {
       console.error('Error looking up user subdomain:', err);
@@ -54,6 +55,7 @@ export async function signInWithEmail(formData: FormData) {
     }
   }
 
+  // Same-origin redirect works with Next.js redirect()
   redirect(redirectTo || '/');
 }
 
