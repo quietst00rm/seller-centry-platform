@@ -1,13 +1,13 @@
 'use client';
 
-import { CheckCircle, DollarSign, Clock, TrendingUp } from "lucide-react";
+import { CheckCircle, DollarSign, Shield, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
 interface ResolvedKPIMetrics {
   totalResolved: number;
   revenueSaved: number;
-  avgResolutionTime: number;
+  asinsProtected: number;
   thisMonthResolved: number;
 }
 
@@ -191,13 +191,13 @@ export function ResolvedKPIGrid({ metrics }: ResolvedKPIGridProps) {
       }
     },
     {
-      icon: <Clock className="h-5 w-5 text-warning" />,
-      title: "Avg Resolution Time",
-      value: `${metrics.avgResolutionTime} days`,
+      icon: <Shield className="h-5 w-5 text-success" />,
+      title: "ASINs Protected",
+      value: metrics.asinsProtected.toString(),
       trend: {
-        value: "Mean Time",
+        value: "All Time",
         direction: "neutral",
-        color: "warning"
+        color: "success"
       }
     },
     {

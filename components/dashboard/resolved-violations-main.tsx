@@ -75,17 +75,9 @@ export function ResolvedViolationsMain({ onViewCase }: ResolvedViolationsMainPro
     const totalResolved = resolvedViolations.length;
     const totalRevenueSaved = resolvedViolations.reduce((sum, violation) => sum + violation.atRiskSales, 0);
 
-    // Calculate average resolution time
-    const resolvedWithDates = resolvedViolations.filter((v) => v.date && v.dateResolved);
-    const avgResolutionTime =
-      resolvedWithDates.length > 0
-        ? resolvedWithDates.reduce((sum, v) => {
-            const startDate = new Date(v.date);
-            const endDate = new Date(v.dateResolved!);
-            const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-            return sum + days;
-          }, 0) / resolvedWithDates.length
-        : 0;
+    // Calculate unique ASINs protected
+    const uniqueAsins = new Set(resolvedViolations.map((v) => v.asin).filter(Boolean));
+    const asinsProtected = uniqueAsins.size;
 
     // Calculate this month resolved
     const thisMonthResolved = resolvedViolations.filter((v) => {
@@ -99,7 +91,7 @@ export function ResolvedViolationsMain({ onViewCase }: ResolvedViolationsMainPro
     return {
       totalResolved,
       revenueSaved: totalRevenueSaved,
-      avgResolutionTime: Math.round(avgResolutionTime * 10) / 10,
+      asinsProtected,
       thisMonthResolved,
     };
   }, [resolvedViolations]);
