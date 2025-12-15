@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getTenantBySubdomain } from '@/lib/google/sheets';
 import { LovableDashboardClient } from '@/components/dashboard/lovable-dashboard-client';
 
 export async function generateMetadata({
@@ -36,6 +38,22 @@ export default async function SubdomainDashboard({
         </div>
       </div>
     );
+  }
+
+  // Authorization check: Verify user email matches tenant's authorized email
+  const tenant = await getTenantBySubdomain(subdomain);
+
+  if (!tenant) {
+    // Tenant not found - redirect to unauthorized
+    redirect('/unauthorized?reason=tenant_not_found');
+  }
+
+  const userEmail = user.email?.toLowerCase();
+  const tenantEmail = tenant.email?.toLowerCase();
+
+  // Check if user's email matches the tenant's authorized email
+  if (!userEmail || !tenantEmail || userEmail !== tenantEmail) {
+    redirect('/unauthorized?reason=email_mismatch');
   }
 
   return <LovableDashboardClient subdomain={subdomain} user={user} />;
