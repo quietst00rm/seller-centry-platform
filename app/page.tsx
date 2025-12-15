@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import SmoothScroll from '@/components/SmoothScroll';
+import { InviteHandler } from '@/components/invite-handler';
 
 // Dynamically import 3D scene to avoid SSR issues
 const HeroScene = dynamic(() => import('@/components/three/HeroScene'), {
@@ -91,6 +92,7 @@ export default function ComingSoonPage() {
 
   return (
     <SmoothScroll>
+      <InviteHandler />
       <div
         className="min-h-screen relative overflow-hidden"
         style={{ backgroundColor: '#FDFBF9' }}
