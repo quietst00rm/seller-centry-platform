@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
@@ -19,47 +19,101 @@ function SetupPasswordContent() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
+  const initRef = useRef(false);
+  const tokensRef = useRef<{ access: string | null; refresh: string | null }>({ access: null, refresh: null });
+
+  // Capture tokens immediately on first render, before any async operations
+  if (!initRef.current && typeof window !== 'undefined') {
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      tokensRef.current = {
+        access: hashParams.get('access_token'),
+        refresh: hashParams.get('refresh_token'),
+      };
+    }
+  }
 
   useEffect(() => {
+    // Prevent double initialization in React Strict Mode
+    if (initRef.current) return;
+    initRef.current = true;
+
+    const supabase = createClient();
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const accessToken = tokensRef.current.access;
+    const refreshToken = tokensRef.current.refresh;
+
+    const setValidSession = () => {
+      if (mounted && isValidSession !== true) {
+        // Clear hash from URL
+        if (window.location.hash) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        setIsValidSession(true);
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    };
+
+    const setInvalidSession = () => {
+      if (mounted && isValidSession === null) {
+        setIsValidSession(false);
+      }
+    };
+
+    // Listen for auth state changes first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session) {
+        setValidSession();
+      }
+    });
+
     const initializeSession = async () => {
-      const supabase = createClient();
+      // Check for existing session first
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
 
-      // First, check if there are tokens in the URL hash
-      const hash = window.location.hash;
-      if (hash) {
-        const hashParams = new URLSearchParams(hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
+      if (existingSession) {
+        setValidSession();
+        return;
+      }
 
-        if (accessToken && refreshToken) {
-          // Set the session using tokens from the invite link
-          const { error: sessionError } = await supabase.auth.setSession({
+      // Try to set session from tokens if we have them
+      if (accessToken && refreshToken) {
+        try {
+          const { data, error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
-          if (sessionError) {
-            console.error('Error setting session:', sessionError);
-            setIsValidSession(false);
+          if (!sessionError && data.session) {
+            setValidSession();
             return;
           }
-
-          // Clear the hash from the URL for cleaner display
-          window.history.replaceState(null, '', window.location.pathname);
-
-          // Session established from tokens
-          setIsValidSession(true);
-          return;
+          // If setSession fails, continue to timeout
+        } catch (e) {
+          // Continue to timeout
         }
       }
 
-      // No tokens in hash, check for existing session
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsValidSession(!!session);
+      // Set a timeout to eventually fail if no session is established
+      timeoutId = setTimeout(() => {
+        setInvalidSession();
+      }, 3000);
     };
 
-    initializeSession();
-  }, []);
+    // Small delay to allow Supabase to potentially auto-process URL
+    setTimeout(() => {
+      initializeSession();
+    }, 100);
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isValidSession]);
 
   const validatePassword = (): string | null => {
     if (password.length < 8) {
@@ -110,7 +164,7 @@ function SetupPasswordContent() {
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading...</p>
+          <p className="mt-4 text-muted-foreground">Setting up your account...</p>
         </div>
       </div>
     );
