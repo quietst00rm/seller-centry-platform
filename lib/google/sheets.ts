@@ -216,3 +216,53 @@ export function filterViolations(
 
   return filtered;
 }
+
+// Get subdomain(s) for a user by email
+export async function getSubdomainsByEmail(email: string): Promise<string[]> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: CLIENT_MAPPING_SHEET_ID,
+      range: `'All Seller Information'!A:L`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length < 2) {
+      return [];
+    }
+
+    const emailLower = email.toLowerCase();
+    const subdomains: string[] = [];
+
+    // Find all rows matching the email (column C, index 2)
+    // Skip header row (index 0)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowEmail = (row[2] || '').toString().toLowerCase().trim();
+
+      if (rowEmail === emailLower) {
+        // Get subdomain from column L (full URL) or column A (store name)
+        const columnL = (row[11] || '').toString().trim();
+        const columnA = (row[0] || '').toString().trim();
+
+        // Extract just the subdomain part
+        let subdomain = '';
+        if (columnL && columnL.includes('.sellercentry.com')) {
+          subdomain = columnL.replace('.sellercentry.com', '');
+        } else if (columnA) {
+          subdomain = columnA.toLowerCase();
+        }
+
+        if (subdomain && !subdomains.includes(subdomain)) {
+          subdomains.push(subdomain);
+        }
+      }
+    }
+
+    return subdomains;
+  } catch (error) {
+    console.error('Error fetching subdomains by email:', error);
+    throw error;
+  }
+}

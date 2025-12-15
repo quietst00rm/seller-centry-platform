@@ -1,8 +1,22 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getSubdomainsByEmail } from '@/lib/google/sheets';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+
+// Domains that indicate we're on the generic/preview URL (no subdomain)
+const GENERIC_DOMAINS = [
+  'seller-centry-platform.vercel.app',
+  'localhost:3000',
+  '127.0.0.1:3000',
+];
+
+// Check if current host is a generic domain (no subdomain)
+function isGenericDomain(host: string): boolean {
+  const hostname = host.toLowerCase();
+  return GENERIC_DOMAINS.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
+}
 
 export async function signInWithEmail(formData: FormData) {
   const email = formData.get('email') as string;
@@ -18,6 +32,26 @@ export async function signInWithEmail(formData: FormData) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Check if we're on a generic domain and should redirect to user's subdomain
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
+
+  if (isGenericDomain(host)) {
+    try {
+      const subdomains = await getSubdomainsByEmail(email);
+
+      if (subdomains.length > 0) {
+        // Redirect to the user's primary subdomain
+        const primarySubdomain = subdomains[0];
+        const targetUrl = `https://${primarySubdomain}.sellercentry.com${redirectTo || '/'}`;
+        redirect(targetUrl);
+      }
+    } catch (err) {
+      console.error('Error looking up user subdomain:', err);
+      // Continue to default redirect if lookup fails
+    }
   }
 
   redirect(redirectTo || '/');
