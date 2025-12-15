@@ -21,13 +21,44 @@ function SetupPasswordContent() {
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check if user has a valid session (from invite link)
-    const checkSession = async () => {
+    const initializeSession = async () => {
       const supabase = createClient();
+
+      // First, check if there are tokens in the URL hash
+      const hash = window.location.hash;
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          // Set the session using tokens from the invite link
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            console.error('Error setting session:', sessionError);
+            setIsValidSession(false);
+            return;
+          }
+
+          // Clear the hash from the URL for cleaner display
+          window.history.replaceState(null, '', window.location.pathname);
+
+          // Session established from tokens
+          setIsValidSession(true);
+          return;
+        }
+      }
+
+      // No tokens in hash, check for existing session
       const { data: { session } } = await supabase.auth.getSession();
       setIsValidSession(!!session);
     };
-    checkSession();
+
+    initializeSession();
   }, []);
 
   const validatePassword = (): string | null => {
@@ -67,7 +98,7 @@ function SetupPasswordContent() {
       // Sign out after setting password so they can log in fresh
       await supabase.auth.signOut();
       setSuccess(true);
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred. Please try again.');
       setLoading(false);
     }
