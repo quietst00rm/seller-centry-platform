@@ -43,6 +43,7 @@ import type { Violation } from '@/types';
 
 interface AppHeaderProps {
   storeName: string;
+  merchantId?: string;
   lastSync?: Date | null;
   onRefresh?: () => void;
   isRefreshing?: boolean;
@@ -55,6 +56,7 @@ interface AppHeaderProps {
 
 export function AppHeader({
   storeName,
+  merchantId,
   lastSync,
   onRefresh,
   isRefreshing,
@@ -170,24 +172,17 @@ export function AppHeader({
     }
   };
 
+  // Build Amazon storefront URL
+  const amazonStorefrontUrl = merchantId
+    ? `https://www.amazon.com/sp?seller=${merchantId}`
+    : null;
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border" style={{ minHeight: '72px' }}>
         <div className="flex items-center justify-between px-4 md:px-6" style={{ minHeight: '72px' }}>
-          {/* Left: Logo */}
-          <div className="flex items-center">
-            <Image
-              src="/logos/seller-centry-logo.png"
-              alt="Seller Centry"
-              width={160}
-              height={40}
-              className="h-8 sm:h-10 w-auto object-contain shrink-0"
-              priority
-            />
-          </div>
-
-          {/* Center: Sync Status (desktop) */}
-          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+          {/* Left: Sync Status (desktop) */}
+          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground min-w-[180px]">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -204,8 +199,44 @@ export function AppHeader({
             </Button>
           </div>
 
+          {/* Left: Logo (mobile only) */}
+          <div className="flex md:hidden items-center">
+            <Image
+              src="/logos/seller-centry-logo.png"
+              alt="Seller Centry"
+              width={120}
+              height={30}
+              className="h-7 w-auto object-contain shrink-0"
+              priority
+            />
+          </div>
+
+          {/* Center: Store Name & Merchant ID (desktop) */}
+          <div className="hidden md:flex flex-col items-center justify-center flex-1">
+            {merchantId && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Merchant ID:</span>
+                {amazonStorefrontUrl ? (
+                  <a
+                    href={amazonStorefrontUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground transition-colors font-mono"
+                  >
+                    {merchantId}
+                  </a>
+                ) : (
+                  <span className="font-mono">{merchantId}</span>
+                )}
+              </div>
+            )}
+            <h1 className="text-xl font-bold text-foreground tracking-tight">
+              {storeName}
+            </h1>
+          </div>
+
           {/* Right: Actions (desktop) */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 min-w-[180px] justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -257,29 +288,54 @@ export function AppHeader({
           </Button>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-border bg-background p-4 space-y-3">
-            {/* Sync Status */}
-            <div className="flex items-center justify-between text-sm text-muted-foreground pb-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span>Synced {formattedSync}</span>
-              </div>
+        {/* Mobile: Store Name & Merchant ID bar */}
+        <div className="md:hidden px-4 pb-3 border-b border-border/50">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h1 className="text-lg font-bold text-foreground">
+                {storeName}
+              </h1>
+              {merchantId && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                  <span>Merchant ID:</span>
+                  {amazonStorefrontUrl ? (
+                    <a
+                      href={amazonStorefrontUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground transition-colors font-mono"
+                    >
+                      {merchantId}
+                    </a>
+                  ) : (
+                    <span className="font-mono">{merchantId}</span>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Sync status on mobile */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              <span>Synced</span>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onRefresh}
                 disabled={isRefreshing}
-                className="h-8 w-8"
+                className="h-6 w-6 ml-0.5"
               >
-                <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+                <RefreshCw className={cn('h-3 w-3', isRefreshing && 'animate-spin')} />
               </Button>
             </div>
+          </div>
+        </div>
 
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-border bg-background p-4 space-y-3">
             <Button
               variant="outline"
               className="w-full justify-start h-11"

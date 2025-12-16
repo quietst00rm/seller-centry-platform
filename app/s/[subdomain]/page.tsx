@@ -63,5 +63,12 @@ export default async function SubdomainDashboard({
     redirect('/unauthorized?reason=email_mismatch');
   }
 
-  return <LovableDashboardClient subdomain={subdomain} user={user} />;
+  return (
+    <LovableDashboardClient
+      subdomain={subdomain}
+      user={user}
+      storeName={tenant.storeName}
+      merchantId={tenant.merchantId}
+    />
+  );
 }

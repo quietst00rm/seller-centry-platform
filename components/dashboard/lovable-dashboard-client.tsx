@@ -12,9 +12,11 @@ import type { Issue } from './issue-table';
 interface LovableDashboardClientProps {
   subdomain: string;
   user: User;
+  storeName: string;
+  merchantId: string;
 }
 
-export function LovableDashboardClient({ subdomain, user }: LovableDashboardClientProps) {
+export function LovableDashboardClient({ subdomain, user, storeName, merchantId }: LovableDashboardClientProps) {
   const { toast } = useToast();
   const { violations, lastSync, refetch } = useViolationsData();
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
@@ -119,7 +121,8 @@ export function LovableDashboardClient({ subdomain, user }: LovableDashboardClie
   return (
     <div className="min-h-screen bg-background">
       <AppHeader
-        storeName={subdomain}
+        storeName={storeName || subdomain}
+        merchantId={merchantId}
         lastSync={lastSync}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
