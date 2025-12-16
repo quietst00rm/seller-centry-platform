@@ -1,9 +1,9 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Check, Clock, FileText, Loader2, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
+import { Check, Clock, FileText, Loader2, EyeOff, CheckCircle2, XCircle, Search, CheckCheck } from 'lucide-react';
 
-export type StatusType = 'working' | 'submitted' | 'waiting-on-client' | 'resolved' | 'ignored' | 'acknowledged' | 'denied';
+export type StatusType = 'working' | 'submitted' | 'waiting-on-client' | 'resolved' | 'ignored' | 'acknowledged' | 'denied' | 'assessing' | 'review-resolved';
 
 interface StatusChipProps {
   status: StatusType;
@@ -56,6 +56,18 @@ const statusConfig = {
     // Critical Red #DC2626
     className: 'bg-destructive/10 text-destructive border-destructive/20',
   },
+  'assessing': {
+    label: 'Assessing',
+    icon: Search,
+    // Amber/Orange for assessment in progress
+    className: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  },
+  'review-resolved': {
+    label: 'Review Resolved',
+    icon: CheckCheck,
+    // Similar to resolved but with a double-check indicator
+    className: 'bg-muted text-muted-foreground border-border',
+  },
 } as const;
 
 export function StatusChip({ status, className, showIcon = true }: StatusChipProps) {
@@ -85,7 +97,10 @@ export function getStatusType(status: string): StatusType {
   if (statusLower === 'ignored') return 'ignored';
   if (statusLower === 'acknowledged') return 'acknowledged';
   if (statusLower === 'denied') return 'denied';
+  if (statusLower === 'assessing') return 'assessing';
+  if (statusLower === 'review resolved') return 'review-resolved';
 
-  // Fallback for any unrecognized status
-  return 'working';
+  // Fallback: display as assessing for unknown statuses (better than defaulting to working)
+  console.warn(`Unknown status encountered: "${status}", defaulting to assessing`);
+  return 'assessing';
 }
