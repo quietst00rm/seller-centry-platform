@@ -32,9 +32,11 @@ export interface Violation {
 }
 
 export type ViolationStatus =
+  | 'Assessing'
   | 'Working'
   | 'Waiting on Client'
   | 'Submitted'
+  | 'Review Resolved'
   | 'Denied'
   | 'Ignored'
   | 'Resolved'
