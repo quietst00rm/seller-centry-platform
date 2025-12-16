@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import type { CardFilterType } from './simple-kpi-cards';
 
 interface FilterState {
   dateRange: string;
@@ -23,9 +24,17 @@ interface ViolationsFilterControlsProps {
   filters: FilterState;
   onFilterChange: (filters: Partial<FilterState>) => void;
   isActiveTab?: boolean;
+  cardFilter?: CardFilterType;
+  onCardFilterClear?: () => void;
 }
 
-export function ViolationsFilterControls({ filters, onFilterChange, isActiveTab = true }: ViolationsFilterControlsProps) {
+export function ViolationsFilterControls({
+  filters,
+  onFilterChange,
+  isActiveTab = true,
+  cardFilter,
+  onCardFilterClear,
+}: ViolationsFilterControlsProps) {
   const defaultDateRange = isActiveTab ? 'All Time' : 'Last 30 Days';
 
   const handleSearchChange = (value: string) => {
@@ -51,13 +60,25 @@ export function ViolationsFilterControls({ filters, onFilterChange, isActiveTab 
       search: '',
       showNotesOnly: false,
     });
+    // Also clear card filter when clearing all
+    if (onCardFilterClear) {
+      onCardFilterClear();
+    }
   };
 
   const activeFilterCount =
     filters.statuses.length +
     (filters.search ? 1 : 0) +
     (filters.dateRange !== defaultDateRange ? 1 : 0) +
-    (filters.showNotesOnly ? 1 : 0);
+    (filters.showNotesOnly ? 1 : 0) +
+    (cardFilter ? 1 : 0);
+
+  // Get the display label for card filter
+  const getCardFilterLabel = () => {
+    if (cardFilter === 'needsAction') return 'Needs Your Action';
+    if (cardFilter === 'newThisWeek') return 'New This Week';
+    return '';
+  };
 
   // Active tab status options
   const activeStatusOptions = [
@@ -159,6 +180,16 @@ export function ViolationsFilterControls({ filters, onFilterChange, isActiveTab 
       {/* Active filters display */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
+          {/* Card Filter Badge - Prominent display */}
+          {cardFilter && onCardFilterClear && (
+            <Badge
+              variant="secondary"
+              className="cursor-pointer hover:bg-orange-600 bg-orange-500 text-white font-semibold px-3 py-1"
+              onClick={onCardFilterClear}
+            >
+              Showing: {getCardFilterLabel()} ✕
+            </Badge>
+          )}
           {filters.showNotesOnly && (
             <Badge
               variant="secondary"

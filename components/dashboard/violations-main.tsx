@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { ViolationsFilterControls } from './violations-filter-controls';
-import { SimpleKPICards } from './simple-kpi-cards';
+import { SimpleKPICards, CardFilterType } from './simple-kpi-cards';
 import { NeedsAttentionCard } from './needs-attention-card';
 import { IssueTable, Issue } from './issue-table';
 import { useViolationsData } from '@/hooks/use-violations-data';
@@ -26,6 +26,7 @@ export function ViolationsMain({ onViewCase }: ViolationsMainProps) {
     search: '',
     showNotesOnly: false,
   });
+  const [cardFilter, setCardFilter] = useState<CardFilterType>(null);
 
   // Count violations with notes
   const violationsWithNotesCount = useMemo(() => {
@@ -34,12 +35,55 @@ export function ViolationsMain({ onViewCase }: ViolationsMainProps) {
     ).length;
   }, [violations]);
 
+  // Calculate "Needs Your Action" count - violations with status "Waiting" or "Waiting on Client"
+  const needsActionCount = useMemo(() => {
+    return violations.filter((v) => {
+      const statusLower = v.status.toLowerCase().trim();
+      return statusLower === 'waiting' || statusLower === 'waiting on client';
+    }).length;
+  }, [violations]);
+
+  // Calculate "New This Week" count - violations from the last 7 days
+  const newThisWeekCount = useMemo(() => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return violations.filter((v) => {
+      if (v.status.toLowerCase() === 'resolved') return false;
+      const violationDate = new Date(v.date);
+      return violationDate >= sevenDaysAgo;
+    }).length;
+  }, [violations]);
+
+  // Helper to check if a violation matches "Needs Your Action"
+  const isNeedsAction = (status: string) => {
+    const statusLower = status.toLowerCase().trim();
+    return statusLower === 'waiting' || statusLower === 'waiting on client';
+  };
+
+  // Helper to check if a violation is "New This Week"
+  const isNewThisWeek = (dateStr: string) => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const violationDate = new Date(dateStr);
+    return violationDate >= sevenDaysAgo;
+  };
+
   // Filter the violations based on current filters
   const filteredViolations = useMemo(() => {
     const filtered = violations.filter((violation) => {
       // Hide resolved violations by default
       if (filters.statuses.length === 0 && violation.status.toLowerCase() === 'resolved') {
         return false;
+      }
+
+      // Card filter - "Needs Your Action"
+      if (cardFilter === 'needsAction') {
+        if (!isNeedsAction(violation.status)) return false;
+      }
+
+      // Card filter - "New This Week"
+      if (cardFilter === 'newThisWeek') {
+        if (!isNewThisWeek(violation.date)) return false;
       }
 
       // Notes filter
@@ -81,7 +125,7 @@ export function ViolationsMain({ onViewCase }: ViolationsMainProps) {
     });
 
     return filtered;
-  }, [violations, filters]);
+  }, [violations, filters, cardFilter]);
 
   // Calculate simple KPI metrics
   const kpiMetrics = useMemo(() => {
@@ -165,10 +209,23 @@ export function ViolationsMain({ onViewCase }: ViolationsMainProps) {
       />
 
       {/* Simple KPI Cards */}
-      <SimpleKPICards openViolations={kpiMetrics.openViolations} atRiskSales={kpiMetrics.atRiskSales} />
+      <SimpleKPICards
+        openViolations={kpiMetrics.openViolations}
+        atRiskSales={kpiMetrics.atRiskSales}
+        needsActionCount={needsActionCount}
+        newThisWeekCount={newThisWeekCount}
+        activeCardFilter={cardFilter}
+        onCardFilterChange={setCardFilter}
+      />
 
       {/* Filter Controls */}
-      <ViolationsFilterControls filters={filters} onFilterChange={handleFilterChange} isActiveTab={true} />
+      <ViolationsFilterControls
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        isActiveTab={true}
+        cardFilter={cardFilter}
+        onCardFilterClear={() => setCardFilter(null)}
+      />
 
       {/* Enhanced Table */}
       <div className="bg-card rounded-xl border border-border shadow-card">
