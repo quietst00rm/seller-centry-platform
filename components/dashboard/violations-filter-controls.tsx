@@ -83,6 +83,7 @@ export function ViolationsFilterControls({
   // Active tab status options
   const activeStatusOptions = [
     { value: 'all', label: 'All Statuses' },
+    { value: 'Assessing', label: 'Assessing' },
     { value: 'Working', label: 'Working' },
     { value: 'Waiting on Client', label: 'Waiting on Client' },
     { value: 'Submitted', label: 'Submitted' },
@@ -93,6 +94,7 @@ export function ViolationsFilterControls({
   const resolvedStatusOptions = [
     { value: 'all', label: 'All' },
     { value: 'Resolved', label: 'Resolved' },
+    { value: 'Review Resolved', label: 'Review Resolved' },
     { value: 'Ignored', label: 'Ignored' },
   ];
 
