@@ -181,22 +181,34 @@ export function AppHeader({
     <>
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border" style={{ minHeight: '72px' }}>
         <div className="flex items-center justify-between px-4 md:px-6" style={{ minHeight: '72px' }}>
-          {/* Left: Sync Status (desktop) */}
-          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground min-w-[180px]">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span>Synced {formattedSync}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="h-8 w-8 ml-1"
-            >
-              <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
-            </Button>
+          {/* Left: Logo (desktop) */}
+          <div className="hidden md:flex items-center gap-8 min-w-[320px]">
+            <Image
+              src="/logos/seller-centry-logo.png"
+              alt="Seller Centry"
+              width={160}
+              height={40}
+              className="h-10 w-auto object-contain shrink-0"
+              priority
+            />
+            {/* Merchant ID next to logo */}
+            {merchantId && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground font-medium">Merchant ID:</span>
+                {amazonStorefrontUrl ? (
+                  <a
+                    href={amazonStorefrontUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 transition-colors font-mono font-medium"
+                  >
+                    {merchantId}
+                  </a>
+                ) : (
+                  <span className="font-mono text-muted-foreground">{merchantId}</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Left: Logo (mobile only) */}
@@ -211,32 +223,15 @@ export function AppHeader({
             />
           </div>
 
-          {/* Center: Store Name & Merchant ID (desktop) */}
+          {/* Center: Store Name (desktop) */}
           <div className="hidden md:flex flex-col items-center justify-center flex-1">
-            {merchantId && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Merchant ID:</span>
-                {amazonStorefrontUrl ? (
-                  <a
-                    href={amazonStorefrontUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground transition-colors font-mono"
-                  >
-                    {merchantId}
-                  </a>
-                ) : (
-                  <span className="font-mono">{merchantId}</span>
-                )}
-              </div>
-            )}
-            <h1 className="text-xl font-bold text-foreground tracking-tight">
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">
               {storeName}
             </h1>
           </div>
 
           {/* Right: Actions (desktop) */}
-          <div className="hidden md:flex items-center gap-2 min-w-[180px] justify-end">
+          <div className="hidden md:flex items-center gap-2 min-w-[320px] justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -303,7 +298,7 @@ export function AppHeader({
                       href={amazonStorefrontUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground transition-colors font-mono"
+                      className="text-blue-400 hover:text-blue-300 transition-colors font-mono"
                     >
                       {merchantId}
                     </a>
