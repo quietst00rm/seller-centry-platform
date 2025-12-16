@@ -12,12 +12,16 @@ interface ViolationsTableProps {
 const getStatusBadgeClass = (status: ViolationStatus): string => {
   const baseClass = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium';
   switch (status) {
+    case 'Assessing':
+      return `${baseClass} bg-blue-500/20 text-blue-400`;
     case 'Working':
       return `${baseClass} bg-cyan-500/20 text-cyan-400`;
     case 'Waiting on Client':
       return `${baseClass} bg-yellow-500/20 text-yellow-400`;
     case 'Submitted':
       return `${baseClass} bg-purple-500/20 text-purple-400`;
+    case 'Review Resolved':
+      return `${baseClass} bg-teal-500/20 text-teal-400`;
     case 'Denied':
       return `${baseClass} bg-red-500/20 text-red-400`;
     case 'Resolved':

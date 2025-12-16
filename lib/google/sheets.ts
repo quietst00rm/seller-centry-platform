@@ -88,15 +88,20 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
 // Parse violation status from sheet
 function parseViolationStatus(status: string): ViolationStatus {
   const normalized = status?.trim() || '';
+  const lowerStatus = normalized.toLowerCase();
   const statusMap: Record<string, ViolationStatus> = {
+    'assessing': 'Assessing',
     'working': 'Working',
     'waiting on client': 'Waiting on Client',
     'submitted': 'Submitted',
+    'review resolved': 'Review Resolved',
     'denied': 'Denied',
     'ignored': 'Ignored',
     'resolved': 'Resolved',
   };
-  return statusMap[normalized.toLowerCase()] || 'Working';
+  const result = statusMap[lowerStatus] || 'Assessing';
+  console.log(`[parseViolationStatus] raw="${status}" normalized="${normalized}" lower="${lowerStatus}" result="${result}"`);
+  return result;
 }
 
 // Parse AHR Impact

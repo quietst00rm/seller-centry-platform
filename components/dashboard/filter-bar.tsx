@@ -96,10 +96,12 @@ export function FilterBar({
               onChange={(e) => onStatusFilterChange(e.target.value as ViolationStatus | 'all')}
               className="w-full h-11 px-4 pr-10 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all"
             >
-              <option value="all">All Status</option>
+              <option value="all">All Statuses</option>
+              <option value="Assessing">Assessing</option>
               <option value="Working">Working</option>
               <option value="Waiting on Client">Waiting on Client</option>
               <option value="Submitted">Submitted</option>
+              <option value="Review Resolved">Review Resolved</option>
               <option value="Denied">Denied</option>
               <option value="Ignored">Ignored</option>
             </select>
