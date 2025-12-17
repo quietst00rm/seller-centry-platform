@@ -181,8 +181,9 @@ export function AppHeader({
     <>
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border" style={{ minHeight: '72px' }}>
         <div className="flex items-center justify-between px-4 md:px-6" style={{ minHeight: '72px' }}>
-          {/* Left: Logo (desktop) */}
-          <div className="hidden md:flex items-center gap-8 min-w-[320px]">
+          {/* Left section: Logo + Divider + Store Context + Synced (desktop) */}
+          <div className="hidden md:flex items-center gap-0 flex-1">
+            {/* Logo */}
             <Image
               src="/logos/seller-centry-logo.png"
               alt="Seller Centry"
@@ -191,24 +192,42 @@ export function AppHeader({
               className="h-10 w-auto object-contain shrink-0"
               priority
             />
-            {/* Merchant ID next to logo */}
-            {merchantId && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground font-medium">Merchant ID:</span>
-                {amazonStorefrontUrl ? (
-                  <a
-                    href={amazonStorefrontUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 transition-colors font-mono font-medium"
-                  >
-                    {merchantId}
-                  </a>
-                ) : (
-                  <span className="font-mono text-muted-foreground">{merchantId}</span>
-                )}
-              </div>
-            )}
+
+            {/* Vertical Divider */}
+            <div className="h-10 w-px bg-slate-600 mx-5 shrink-0" />
+
+            {/* Store Context: Store Name + Merchant ID stacked */}
+            <div className="flex flex-col justify-center py-1">
+              <h1 className="text-[15px] font-semibold text-white leading-tight">
+                {storeName}
+              </h1>
+              {merchantId && (
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400 leading-tight mt-0.5">
+                  <span>Merchant ID:</span>
+                  {amazonStorefrontUrl ? (
+                    <a
+                      href={amazonStorefrontUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-slate-400 hover:text-slate-200 hover:underline transition-colors"
+                    >
+                      {merchantId}
+                    </a>
+                  ) : (
+                    <span className="font-mono">{merchantId}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Synced Indicator */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-6">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Synced</span>
+            </div>
           </div>
 
           {/* Left: Logo (mobile only) */}
@@ -223,15 +242,8 @@ export function AppHeader({
             />
           </div>
 
-          {/* Center: Store Name (desktop) */}
-          <div className="hidden md:flex flex-col items-center justify-center flex-1">
-            <h1 className="text-3xl font-bold text-foreground tracking-tight">
-              {storeName}
-            </h1>
-          </div>
-
           {/* Right: Actions (desktop) */}
-          <div className="hidden md:flex items-center gap-2 min-w-[320px] justify-end">
+          <div className="hidden md:flex items-center gap-2 justify-end shrink-0">
             <Button
               variant="outline"
               size="sm"
@@ -287,18 +299,18 @@ export function AppHeader({
         <div className="md:hidden px-4 pb-3 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h1 className="text-lg font-bold text-foreground">
+              <h1 className="text-base font-semibold text-foreground">
                 {storeName}
               </h1>
               {merchantId && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
                   <span>Merchant ID:</span>
                   {amazonStorefrontUrl ? (
                     <a
                       href={amazonStorefrontUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 transition-colors font-mono"
+                      className="font-mono text-slate-400 hover:text-slate-200 hover:underline transition-colors"
                     >
                       {merchantId}
                     </a>
@@ -314,7 +326,7 @@ export function AppHeader({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
-              <span>Synced</span>
+              <span className="hidden xs:inline">Synced</span>
               <Button
                 variant="ghost"
                 size="icon"
