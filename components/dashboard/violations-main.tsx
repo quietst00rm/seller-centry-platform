@@ -148,31 +148,16 @@ export function ViolationsMain({ onViewCase }: ViolationsMainProps) {
     setFilters((prev) => ({ ...prev, showNotesOnly: !prev.showNotesOnly }));
   };
 
-  const mapViolationStatusToIssueStatus = (status: string): Issue['status'] => {
-    const statusLower = status.toLowerCase().trim();
-
-    if (statusLower === 'working') return 'Working';
-    if (statusLower === 'submitted') return 'Submitted';
-    if (statusLower === 'waiting on client') return 'Waiting on Client';
-    if (statusLower === 'resolved') return 'Resolved';
-    if (statusLower === 'ignored') return 'Ignored';
-    if (statusLower === 'acknowledged') return 'Acknowledged';
-    if (statusLower === 'denied') return 'Denied';
-
-    return 'Working';
-  };
-
   // Convert violations to issues format for the table
+  // Note: violation.status is already a ViolationStatus from the API, pass it through directly
   const issuesForTable: Issue[] = filteredViolations
     .map((violation) => {
-      const mappedStatus: Issue['status'] = mapViolationStatusToIssueStatus(violation.status);
-
       return {
         id: violation.id,
         asin: violation.asin,
         product: violation.productTitle,
         type: violation.reason,
-        status: mappedStatus,
+        status: violation.status,
         opened: violation.date,
         atRiskSales: violation.atRiskSales,
         impact: (violation.ahrImpact as 'Low' | 'Medium' | 'High') || 'Low',
@@ -234,6 +219,7 @@ export function ViolationsMain({ onViewCase }: ViolationsMainProps) {
           onViewCase={onViewCase || (() => {})}
           statusOptions={[
             { value: 'all', label: 'All Statuses' },
+            { value: 'Assessing', label: 'Assessing' },
             { value: 'Working', label: 'Working' },
             { value: 'Submitted', label: 'Submitted' },
             { value: 'Waiting on Client', label: 'Waiting on Client' },
