@@ -9,13 +9,14 @@ import { ImpactBadge, getImpactLevel } from '@/components/ui/impact-badge';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { ArrowUpDown, DollarSign, Calendar, ExternalLink, Search, Filter, MessageSquare } from 'lucide-react';
+import type { ViolationStatus } from '@/types';
 
 export interface Issue {
   id: string;
   asin: string;
   product: string;
   type: string;
-  status: 'Working' | 'Submitted' | 'Waiting on Client' | 'Resolved' | 'Ignored' | 'Acknowledged' | 'Denied';
+  status: ViolationStatus;
   opened: string;
   atRiskSales: number;
   impact: 'Low' | 'Medium' | 'High';
