@@ -14,9 +14,10 @@ interface LovableDashboardClientProps {
   user: User;
   storeName: string;
   merchantId: string;
+  documentFolderUrl?: string;
 }
 
-export function LovableDashboardClient({ subdomain, user, storeName, merchantId }: LovableDashboardClientProps) {
+export function LovableDashboardClient({ subdomain, user, storeName, merchantId, documentFolderUrl }: LovableDashboardClientProps) {
   const { toast } = useToast();
   const { violations, lastSync, refetch } = useViolationsData();
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
@@ -131,6 +132,7 @@ export function LovableDashboardClient({ subdomain, user, storeName, merchantId 
         onTicketModalChange={setTicketModalOpen}
         defaultTicketAsin={ticketAsin}
         onExport={handleExport}
+        documentFolderUrl={documentFolderUrl}
       />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">

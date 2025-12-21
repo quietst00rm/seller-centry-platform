@@ -40,7 +40,7 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
 
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: CLIENT_MAPPING_SHEET_ID,
-      range: `'All Seller Information'!A:L`,
+      range: `'All Seller Information'!A:N`,
     });
 
     const rows = response.data.values;
@@ -74,6 +74,7 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
           highImpactCount: parseInt(row[8]) || 0,
           resolvedCount: parseInt(row[9]) || 0,
           subdomain: row[11] || `${columnA}.sellercentry.com`,
+          documentFolderUrl: row[13] || undefined,
         };
       }
     }
