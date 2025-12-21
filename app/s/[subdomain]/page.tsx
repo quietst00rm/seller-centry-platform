@@ -69,6 +69,7 @@ export default async function SubdomainDashboard({
       user={user}
       storeName={tenant.storeName}
       merchantId={tenant.merchantId}
+      documentFolderUrl={tenant.documentFolderUrl}
     />
   );
 }

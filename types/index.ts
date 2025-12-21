@@ -11,6 +11,7 @@ export interface Tenant {
   highImpactCount: number;     // Column I
   resolvedCount: number;       // Column J
   subdomain: string;           // Column L - Full URL like "alwayz-on-sale.sellercentry.com"
+  documentFolderUrl?: string;  // Column N - Link to Seller Document Folders (Google Drive)
 }
 
 // Violation data from individual client sheets

@@ -36,6 +36,7 @@ import {
   RefreshCw,
   Loader2,
   LogOut,
+  FolderUp,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
@@ -52,6 +53,14 @@ interface AppHeaderProps {
   onTicketModalChange?: (open: boolean) => void;
   defaultTicketAsin?: string;
   onExport?: (type: 'active' | 'resolved' | 'weekly') => void;
+  documentFolderUrl?: string;
+}
+
+// Validate Google Drive folder URL format
+function isValidDriveFolderUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith('https://drive.google.com/drive/folders/') &&
+         url.length > 'https://drive.google.com/drive/folders/'.length;
 }
 
 export function AppHeader({
@@ -65,7 +74,15 @@ export function AppHeader({
   onTicketModalChange,
   defaultTicketAsin = '',
   onExport,
+  documentFolderUrl,
 }: AppHeaderProps) {
+  const hasValidDocumentFolder = isValidDriveFolderUrl(documentFolderUrl);
+
+  const handleUploadDocuments = () => {
+    if (hasValidDocumentFolder && documentFolderUrl) {
+      window.open(documentFolderUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [internalTicketModalOpen, setInternalTicketModalOpen] = useState(false);
@@ -273,6 +290,19 @@ export function AppHeader({
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Upload Documents button - only shown if valid URL */}
+            {hasValidDocumentFolder && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUploadDocuments}
+                className="h-9"
+              >
+                <FolderUp className="h-4 w-4 mr-2" />
+                Upload Documents
+              </Button>
+            )}
+
             <Button
               variant="ghost"
               size="sm"
@@ -373,6 +403,21 @@ export function AppHeader({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Upload Documents button - only shown if valid URL */}
+            {hasValidDocumentFolder && (
+              <Button
+                variant="outline"
+                className="w-full justify-start h-11"
+                onClick={() => {
+                  handleUploadDocuments();
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <FolderUp className="h-4 w-4 mr-3" />
+                Upload Documents
+              </Button>
+            )}
 
             <Button
               variant="ghost"

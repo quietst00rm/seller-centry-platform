@@ -134,6 +134,7 @@ export function DashboardClient({ subdomain, user }: DashboardClientProps) {
           onRefresh={handleRefresh}
           onSubmitTicket={() => setIsTicketModalOpen(true)}
           onExport={handleExport}
+          documentFolderUrl={tenant?.documentFolderUrl}
         />
       )}
 

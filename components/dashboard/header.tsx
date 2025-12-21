@@ -1,7 +1,7 @@
 'use client';
 
 import { User } from '@supabase/supabase-js';
-import { RefreshCw, Send, Download, Shield } from 'lucide-react';
+import { RefreshCw, Send, Download, Shield, FolderUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UserDropdown } from '@/components/user-dropdown';
 
@@ -13,6 +13,14 @@ interface DashboardHeaderProps {
   onRefresh: () => void;
   onSubmitTicket: () => void;
   onExport: () => void;
+  documentFolderUrl?: string;
+}
+
+// Validate Google Drive folder URL format
+function isValidDriveFolderUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return url.startsWith('https://drive.google.com/drive/folders/') &&
+         url.length > 'https://drive.google.com/drive/folders/'.length;
 }
 
 export function DashboardHeader({
@@ -23,7 +31,15 @@ export function DashboardHeader({
   onRefresh,
   onSubmitTicket,
   onExport,
+  documentFolderUrl,
 }: DashboardHeaderProps) {
+  const hasValidDocumentFolder = isValidDriveFolderUrl(documentFolderUrl);
+
+  const handleUploadDocuments = () => {
+    if (hasValidDocumentFolder && documentFolderUrl) {
+      window.open(documentFolderUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
   const formatSyncTime = (date: Date | null) => {
     if (!date) return 'Never';
     const now = new Date();
@@ -79,6 +95,19 @@ export function DashboardHeader({
             <Download className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>
           </Button>
+
+          {/* Upload Documents button - ghost style, only shown if valid URL */}
+          {hasValidDocumentFolder && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleUploadDocuments}
+              className="h-9 px-3 text-[#9ca3af] hover:text-white hover:bg-white/10"
+            >
+              <FolderUp className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Upload Documents</span>
+            </Button>
+          )}
 
           {/* Submit Ticket button - orange filled */}
           <Button
