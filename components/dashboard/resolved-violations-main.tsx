@@ -7,6 +7,7 @@ import { IssueTable, Issue } from './issue-table';
 import { useViolationsData } from '@/hooks/use-violations-data';
 
 interface ResolvedViolationsMainProps {
+  subdomain: string;
   onViewCase?: (issue: Issue) => void;
 }
 
@@ -17,8 +18,8 @@ interface FilterState {
   showNotesOnly?: boolean;
 }
 
-export function ResolvedViolationsMain({ onViewCase }: ResolvedViolationsMainProps) {
-  const { violations, loading } = useViolationsData({ tab: 'resolved' });
+export function ResolvedViolationsMain({ subdomain, onViewCase }: ResolvedViolationsMainProps) {
+  const { violations, loading } = useViolationsData({ subdomain, tab: 'resolved' });
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'Last 30 Days',
     statuses: [],

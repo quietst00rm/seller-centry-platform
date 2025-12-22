@@ -19,7 +19,7 @@ interface LovableDashboardClientProps {
 
 export function LovableDashboardClient({ subdomain, user, storeName, merchantId, documentFolderUrl }: LovableDashboardClientProps) {
   const { toast } = useToast();
-  const { violations, lastSync, refetch } = useViolationsData();
+  const { violations, lastSync, refetch } = useViolationsData({ subdomain });
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
@@ -136,7 +136,7 @@ export function LovableDashboardClient({ subdomain, user, storeName, merchantId,
       />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
-        <ViolationsTabManager onViewCase={handleViewCase} />
+        <ViolationsTabManager subdomain={subdomain} onViewCase={handleViewCase} />
       </main>
 
       {/* Case Detail Modal */}
