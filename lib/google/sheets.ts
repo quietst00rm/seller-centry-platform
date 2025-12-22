@@ -272,3 +272,53 @@ export async function getSubdomainsByEmail(email: string): Promise<string[]> {
     throw error;
   }
 }
+
+// Get all accounts (subdomain + store name) for an email - used for multi-account switcher
+export async function getAccountsByEmail(email: string): Promise<{ subdomain: string; storeName: string }[]> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: CLIENT_MAPPING_SHEET_ID,
+      range: `'All Seller Information'!A:L`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length < 2) {
+      return [];
+    }
+
+    const emailLower = email.toLowerCase();
+    const accounts: { subdomain: string; storeName: string }[] = [];
+    const seenSubdomains = new Set<string>();
+
+    // Find all rows matching the email (column C, index 2)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowEmail = (row[2] || '').toString().toLowerCase().trim();
+
+      if (rowEmail === emailLower) {
+        const storeName = (row[0] || '').toString().trim();
+        const columnL = (row[11] || '').toString().trim();
+
+        // Extract subdomain
+        let subdomain = '';
+        if (columnL && columnL.includes('.sellercentry.com')) {
+          subdomain = columnL.replace('.sellercentry.com', '');
+        } else if (storeName) {
+          subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
+        }
+
+        if (subdomain && !seenSubdomains.has(subdomain)) {
+          seenSubdomains.add(subdomain);
+          accounts.push({ subdomain, storeName: storeName || subdomain });
+        }
+      }
+    }
+
+    return accounts;
+  } catch (error) {
+    console.error('Error fetching accounts by email:', error);
+    throw error;
+  }
+}

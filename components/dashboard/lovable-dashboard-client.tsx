@@ -123,6 +123,7 @@ export function LovableDashboardClient({ subdomain, user, storeName, merchantId,
     <div className="min-h-screen bg-background">
       <AppHeader
         storeName={storeName || subdomain}
+        subdomain={subdomain}
         merchantId={merchantId}
         lastSync={lastSync}
         onRefresh={handleRefresh}

@@ -8,6 +8,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -37,13 +39,17 @@ import {
   Loader2,
   LogOut,
   FolderUp,
+  Store,
+  Check,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
+import { useUserAccounts } from '@/hooks/use-user-accounts';
 import type { Violation } from '@/types';
 
 interface AppHeaderProps {
   storeName: string;
+  subdomain: string;
   merchantId?: string;
   lastSync?: Date | null;
   onRefresh?: () => void;
@@ -65,6 +71,7 @@ function isValidDriveFolderUrl(url: string | undefined): boolean {
 
 export function AppHeader({
   storeName,
+  subdomain,
   merchantId,
   lastSync,
   onRefresh,
@@ -77,6 +84,14 @@ export function AppHeader({
   documentFolderUrl,
 }: AppHeaderProps) {
   const hasValidDocumentFolder = isValidDriveFolderUrl(documentFolderUrl);
+  const { accounts, loading: accountsLoading } = useUserAccounts();
+  const hasMultipleAccounts = accounts.length > 1;
+
+  const handleSwitchAccount = (targetSubdomain: string) => {
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'sellercentry.com';
+    const protocol = rootDomain.includes('localhost') ? 'http' : 'https';
+    window.location.href = `${protocol}://${targetSubdomain}.${rootDomain}`;
+  };
 
   const handleUploadDocuments = () => {
     if (hasValidDocumentFolder && documentFolderUrl) {
@@ -303,15 +318,45 @@ export function AppHeader({
               </Button>
             )}
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="h-9 text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
+            {/* Account Switcher + Sign Out Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Account
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {!accountsLoading && hasMultipleAccounts && (
+                  <>
+                    <DropdownMenuLabel>Switch Account</DropdownMenuLabel>
+                    {accounts.map((account) => {
+                      const isCurrentAccount = subdomain === account.subdomain;
+                      return (
+                        <DropdownMenuItem
+                          key={account.subdomain}
+                          onClick={() => !isCurrentAccount && handleSwitchAccount(account.subdomain)}
+                          className={cn('cursor-pointer', isCurrentAccount && 'bg-primary/10')}
+                        >
+                          <Store className="h-4 w-4 mr-2" />
+                          <span className="flex-1 truncate">{account.storeName}</span>
+                          {isCurrentAccount && <Check className="h-4 w-4 ml-2 text-primary" />}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Mobile: Hamburger */}
@@ -417,6 +462,38 @@ export function AppHeader({
                 <FolderUp className="h-4 w-4 mr-3" />
                 Upload Documents
               </Button>
+            )}
+
+            {/* Account Switcher - only show if multiple accounts */}
+            {!accountsLoading && hasMultipleAccounts && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start h-11">
+                    <Store className="h-4 w-4 mr-3" />
+                    Switch Account
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {accounts.map((account) => {
+                    const isCurrentAccount = subdomain === account.subdomain;
+                    return (
+                      <DropdownMenuItem
+                        key={account.subdomain}
+                        onClick={() => {
+                          if (!isCurrentAccount) {
+                            handleSwitchAccount(account.subdomain);
+                          }
+                          setMobileMenuOpen(false);
+                        }}
+                        className={cn('cursor-pointer', isCurrentAccount && 'bg-primary/10')}
+                      >
+                        <span className="flex-1 truncate">{account.storeName}</span>
+                        {isCurrentAccount && <Check className="h-4 w-4 ml-2 text-primary" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
 
             <Button

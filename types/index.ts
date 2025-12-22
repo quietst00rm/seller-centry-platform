@@ -54,6 +54,12 @@ export interface ViolationsFilter {
   search: string;
 }
 
+// User account for multi-account switcher
+export interface UserAccount {
+  subdomain: string;
+  storeName: string;
+}
+
 // API Response types
 export interface TenantResponse {
   success: boolean;

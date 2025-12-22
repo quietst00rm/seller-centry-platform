@@ -7,6 +7,7 @@ import { UserDropdown } from '@/components/user-dropdown';
 
 interface DashboardHeaderProps {
   storeName: string;
+  subdomain: string;
   user: User;
   lastSynced: Date | null;
   isRefreshing: boolean;
@@ -25,6 +26,7 @@ function isValidDriveFolderUrl(url: string | undefined): boolean {
 
 export function DashboardHeader({
   storeName,
+  subdomain,
   user,
   lastSynced,
   isRefreshing,
@@ -120,7 +122,7 @@ export function DashboardHeader({
           </Button>
 
           {/* User dropdown */}
-          <UserDropdown user={user} />
+          <UserDropdown user={user} currentSubdomain={subdomain} />
         </div>
       </div>
 
