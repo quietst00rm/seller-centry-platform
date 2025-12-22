@@ -8,6 +8,7 @@ import { IssueTable, Issue } from './issue-table';
 import { useViolationsData } from '@/hooks/use-violations-data';
 
 interface ViolationsMainProps {
+  subdomain: string;
   onViewCase?: (issue: Issue) => void;
 }
 
@@ -18,8 +19,8 @@ interface FilterState {
   showNotesOnly: boolean;
 }
 
-export function ViolationsMain({ onViewCase }: ViolationsMainProps) {
-  const { violations, loading } = useViolationsData();
+export function ViolationsMain({ subdomain, onViewCase }: ViolationsMainProps) {
+  const { violations, loading } = useViolationsData({ subdomain });
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'All Time',
     statuses: [],

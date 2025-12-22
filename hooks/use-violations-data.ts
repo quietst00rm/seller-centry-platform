@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Violation, ViolationTab } from '@/types';
 
 interface UseViolationsDataOptions {
+  subdomain: string;
   tab?: ViolationTab;
 }
 
@@ -15,8 +16,8 @@ interface UseViolationsDataReturn {
   refetch: () => Promise<void>;
 }
 
-export function useViolationsData(options: UseViolationsDataOptions = {}): UseViolationsDataReturn {
-  const { tab = 'active' } = options;
+export function useViolationsData(options: UseViolationsDataOptions): UseViolationsDataReturn {
+  const { subdomain, tab = 'active' } = options;
   const [violations, setViolations] = useState<Violation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +28,7 @@ export function useViolationsData(options: UseViolationsDataOptions = {}): UseVi
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams({ tab });
+      const params = new URLSearchParams({ subdomain, tab });
       const response = await fetch(`/api/violations?${params.toString()}`);
 
       if (!response.ok) {
@@ -43,7 +44,7 @@ export function useViolationsData(options: UseViolationsDataOptions = {}): UseVi
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [subdomain, tab]);
 
   // Initial fetch
   useEffect(() => {
