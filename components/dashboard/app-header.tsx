@@ -87,6 +87,16 @@ export function AppHeader({
   const { accounts, loading: accountsLoading } = useUserAccounts();
   const hasMultipleAccounts = accounts.length > 1;
 
+  // Debug: Log accounts when they change
+  useEffect(() => {
+    console.log('[AppHeader] Accounts loaded:', {
+      loading: accountsLoading,
+      count: accounts.length,
+      hasMultiple: hasMultipleAccounts,
+      accounts: accounts,
+    });
+  }, [accounts, accountsLoading, hasMultipleAccounts]);
+
   const handleSwitchAccount = (targetSubdomain: string) => {
     const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'sellercentry.com';
     const protocol = rootDomain.includes('localhost') ? 'http' : 'https';
