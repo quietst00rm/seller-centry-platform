@@ -94,15 +94,15 @@ function parseViolationStatus(status: string): ViolationStatus {
     'assessing': 'Assessing',
     'working': 'Working',
     'waiting on client': 'Waiting on Client',
+    'waiting': 'Waiting on Client',
     'submitted': 'Submitted',
     'review resolved': 'Review Resolved',
     'denied': 'Denied',
     'ignored': 'Ignored',
     'resolved': 'Resolved',
+    'acknowledged': 'Acknowledged',
   };
-  const result = statusMap[lowerStatus] || 'Assessing';
-  console.log(`[parseViolationStatus] raw="${status}" normalized="${normalized}" lower="${lowerStatus}" result="${result}"`);
-  return result;
+  return statusMap[lowerStatus] || 'Assessing';
 }
 
 // Parse AHR Impact
@@ -127,16 +127,44 @@ export async function getViolations(
 
     const sheets = getGoogleSheetsClient();
 
-    // Determine which tab to read from
-    const tabName = tab === 'active' ? 'All Current Violations' : 'All Resolved Violations';
+    // Tab name variations to try - support different naming conventions
+    const tabNameVariations = tab === 'active'
+      ? ['All Current Violations', 'Current Violations', 'Active Violations', 'All Active Violations', 'Open Violations']
+      : ['All Resolved Violations', 'Resolved Violations', 'Closed Violations', 'All Closed Violations'];
 
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${tabName}'!A:N`,
-    });
+    let rows: string[][] | undefined;
+    let usedTabName: string | null = null;
 
-    const rows = response.data.values;
-    if (!rows || rows.length < 2) {
+    // Try each tab name variation until one works
+    for (const tabName of tabNameVariations) {
+      try {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `'${tabName}'!A:N`,
+        });
+        rows = response.data.values as string[][] | undefined;
+        usedTabName = tabName;
+        console.log(`[getViolations] Found tab "${tabName}" for ${tab} violations`);
+        break;
+      } catch (tabError: unknown) {
+        // Tab doesn't exist, try next variation
+        const errorMessage = tabError instanceof Error ? tabError.message : String(tabError);
+        if (errorMessage.includes('Unable to parse range') || errorMessage.includes('not found')) {
+          console.log(`[getViolations] Tab "${tabName}" not found, trying next...`);
+          continue;
+        }
+        // If it's a different error (auth, network, etc.), throw it
+        throw tabError;
+      }
+    }
+
+    if (!usedTabName || !rows) {
+      console.error(`[getViolations] No valid tab found for ${tab} violations. Tried: ${tabNameVariations.join(', ')}`);
+      return [];
+    }
+
+    if (rows.length < 2) {
+      console.log(`[getViolations] Tab "${usedTabName}" exists but has no data rows`);
       return [];
     }
 
@@ -171,6 +199,7 @@ export async function getViolations(
       violations.push(violation);
     }
 
+    console.log(`[getViolations] Returning ${violations.length} ${tab} violations from "${usedTabName}"`);
     return violations;
   } catch (error) {
     console.error('Error fetching violations:', error);
@@ -269,6 +298,56 @@ export async function getSubdomainsByEmail(email: string): Promise<string[]> {
     return subdomains;
   } catch (error) {
     console.error('Error fetching subdomains by email:', error);
+    throw error;
+  }
+}
+
+// Get all accounts (subdomain + store name) for an email - used for multi-account switcher
+export async function getAccountsByEmail(email: string): Promise<{ subdomain: string; storeName: string }[]> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: CLIENT_MAPPING_SHEET_ID,
+      range: `'All Seller Information'!A:L`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length < 2) {
+      return [];
+    }
+
+    const emailLower = email.toLowerCase();
+    const accounts: { subdomain: string; storeName: string }[] = [];
+    const seenSubdomains = new Set<string>();
+
+    // Find all rows matching the email (column C, index 2)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowEmail = (row[2] || '').toString().toLowerCase().trim();
+
+      if (rowEmail === emailLower) {
+        const storeName = (row[0] || '').toString().trim();
+        const columnL = (row[11] || '').toString().trim();
+
+        // Extract subdomain
+        let subdomain = '';
+        if (columnL && columnL.includes('.sellercentry.com')) {
+          subdomain = columnL.replace('.sellercentry.com', '');
+        } else if (storeName) {
+          subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
+        }
+
+        if (subdomain && !seenSubdomains.has(subdomain)) {
+          seenSubdomains.add(subdomain);
+          accounts.push({ subdomain, storeName: storeName || subdomain });
+        }
+      }
+    }
+
+    return accounts;
+  } catch (error) {
+    console.error('Error fetching accounts by email:', error);
     throw error;
   }
 }

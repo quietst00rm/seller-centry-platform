@@ -128,6 +128,7 @@ export function DashboardClient({ subdomain, user }: DashboardClientProps) {
       ) : (
         <DashboardHeader
           storeName={tenant?.storeName || subdomain}
+          subdomain={subdomain}
           user={user}
           lastSynced={lastSynced}
           isRefreshing={isRefreshing}

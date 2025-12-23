@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getSubdomainsByEmail } from '@/lib/google/sheets';
+import { getSubdomainsByEmail, getAccountsByEmail } from '@/lib/google/sheets';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,13 +11,17 @@ export async function GET(request: NextRequest) {
     // Subdomain info is not sensitive - it's just which subdomain a user belongs to
     // This is needed for the setup-password flow where session cookies may not be synced
     if (emailParam) {
-      const subdomains = await getSubdomainsByEmail(emailParam);
+      const [subdomains, accounts] = await Promise.all([
+        getSubdomainsByEmail(emailParam),
+        getAccountsByEmail(emailParam),
+      ]);
 
       return NextResponse.json({
         success: true,
         data: {
           email: emailParam,
           subdomains,
+          accounts,
           primarySubdomain: subdomains.length > 0 ? subdomains[0] : null,
         },
       });
@@ -42,14 +46,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Look up subdomains for this email
-    const subdomains = await getSubdomainsByEmail(userEmail);
+    // Look up subdomains and accounts for this email
+    const [subdomains, accounts] = await Promise.all([
+      getSubdomainsByEmail(userEmail),
+      getAccountsByEmail(userEmail),
+    ]);
 
     return NextResponse.json({
       success: true,
       data: {
         email: userEmail,
         subdomains,
+        accounts,
         primarySubdomain: subdomains.length > 0 ? subdomains[0] : null,
       },
     });

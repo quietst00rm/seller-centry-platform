@@ -19,7 +19,7 @@ interface FilterState {
 }
 
 export function ResolvedViolationsMain({ subdomain, onViewCase }: ResolvedViolationsMainProps) {
-  const { violations, loading } = useViolationsData({ subdomain, tab: 'resolved' });
+  const { violations, loading, error } = useViolationsData({ subdomain, tab: 'resolved' });
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'Last 30 Days',
     statuses: [],
@@ -130,6 +130,19 @@ export function ResolvedViolationsMain({ subdomain, onViewCase }: ResolvedViolat
       <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-muted-foreground">Loading resolved violations data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col items-center justify-center h-64 text-center px-4">
+          <div className="text-destructive font-medium mb-2">Unable to load resolved violations</div>
+          <div className="text-muted-foreground text-sm max-w-md">
+            There was an error loading the resolved violations data. This could be due to a connection issue or the data source being unavailable.
+          </div>
         </div>
       </div>
     );
