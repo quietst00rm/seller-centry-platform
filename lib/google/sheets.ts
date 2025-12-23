@@ -312,6 +312,11 @@ export async function getSubdomainsByEmail(email: string): Promise<string[]> {
   }
 }
 
+// Master user emails that can see ALL accounts (for admin access)
+const MASTER_USER_EMAILS = [
+  'joe@marketools.io',
+];
+
 // Get all accounts (subdomain + store name) for an email - used for multi-account switcher
 export async function getAccountsByEmail(email: string): Promise<{ subdomain: string; storeName: string }[]> {
   try {
@@ -328,22 +333,26 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
       return [];
     }
 
-    console.log(`[getAccountsByEmail] Searching for email: ${email} in ${rows.length - 1} rows`);
-
     const emailLower = email.toLowerCase();
+    const isMasterUser = MASTER_USER_EMAILS.some(master => master.toLowerCase() === emailLower);
+
+    console.log(`[getAccountsByEmail] Searching for email: ${email} in ${rows.length - 1} rows (isMasterUser: ${isMasterUser})`);
+
     const accounts: { subdomain: string; storeName: string }[] = [];
     const seenSubdomains = new Set<string>();
 
-    // Find all rows matching the email (column C, index 2)
+    // Find all rows - for master users, get ALL accounts; for regular users, match by email
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       const rowEmail = (row[2] || '').toString().toLowerCase().trim();
 
-      if (rowEmail === emailLower) {
+      // Master users see all accounts, regular users only see their own
+      if (isMasterUser || rowEmail === emailLower) {
         const storeName = (row[0] || '').toString().trim();
         const columnL = (row[11] || '').toString().trim();
 
-        console.log(`[getAccountsByEmail] Found match at row ${i + 1}: storeName="${storeName}", columnL="${columnL}"`);
+        // Skip rows without a store name
+        if (!storeName) continue;
 
         // Extract subdomain from column L (could be various formats)
         let subdomain = '';
@@ -370,8 +379,6 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
           subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
         }
 
-        console.log(`[getAccountsByEmail] Extracted subdomain: "${subdomain}"`);
-
         if (subdomain && !seenSubdomains.has(subdomain)) {
           seenSubdomains.add(subdomain);
           accounts.push({ subdomain, storeName: storeName || subdomain });
@@ -379,7 +386,7 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
       }
     }
 
-    console.log(`[getAccountsByEmail] Found ${accounts.length} accounts for ${email}:`, accounts);
+    console.log(`[getAccountsByEmail] Found ${accounts.length} accounts for ${email}`);
     return accounts;
   } catch (error) {
     console.error('Error fetching accounts by email:', error);
