@@ -46,6 +46,14 @@ export async function GET(request: NextRequest) {
     // Fetch violations from the tenant's sheet
     const violations = await getViolations(tenant, tab);
 
+    // Log raw data for debugging
+    console.log(`[violations API] Fetched ${violations.length} ${tab} violations for subdomain: ${subdomain}`);
+    if (violations.length > 0) {
+      // Log unique statuses found
+      const statuses = [...new Set(violations.map(v => v.status))];
+      console.log(`[violations API] Statuses found: ${statuses.join(', ')}`);
+    }
+
     // Apply filters
     const filteredViolations = filterViolations(violations, {
       timeFilter,

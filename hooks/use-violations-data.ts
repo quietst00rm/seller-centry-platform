@@ -36,7 +36,17 @@ export function useViolationsData(options: UseViolationsDataOptions): UseViolati
       }
 
       const data = await response.json();
-      setViolations(data.data?.violations || []);
+      const fetchedViolations = data.data?.violations || [];
+
+      // Debug logging to trace data flow
+      console.log(`[useViolationsData] Subdomain: ${subdomain}, Tab: ${tab}`);
+      console.log(`[useViolationsData] API returned ${fetchedViolations.length} violations`);
+      if (fetchedViolations.length > 0) {
+        const statuses = [...new Set(fetchedViolations.map((v: Violation) => v.status))];
+        console.log(`[useViolationsData] Statuses in data: ${statuses.join(', ')}`);
+      }
+
+      setViolations(fetchedViolations);
       setLastSync(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch violations');

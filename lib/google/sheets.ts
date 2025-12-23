@@ -171,12 +171,22 @@ export async function getViolations(
     // Skip header row and map data
     const violations: Violation[] = [];
 
+    // Debug: Log header row to verify column structure
+    if (rows.length > 0) {
+      console.log(`[getViolations] Header row: ${rows[0].slice(0, 14).join(' | ')}`);
+    }
+
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
 
       // Skip empty rows (rows without Violation ID AND without ASIN)
       if (!row || (!row[0] && !row[4])) {
         continue;
+      }
+
+      // Debug: Log raw status value from column L (index 11) for first few rows
+      if (i <= 5) {
+        console.log(`[getViolations] Row ${i} - Raw status (col L): "${row[11]}" → Parsed: "${tab === 'resolved' ? 'Resolved' : parseViolationStatus(row[11])}"`);
       }
 
       const violation: Violation = {

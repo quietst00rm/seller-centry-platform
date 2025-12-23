@@ -71,11 +71,17 @@ export function ViolationsMain({ subdomain, onViewCase }: ViolationsMainProps) {
 
   // Filter the violations based on current filters
   const filteredViolations = useMemo(() => {
+    // Debug: log raw violations before filtering
+    console.log(`[ViolationsMain] Raw violations count: ${violations.length}`);
+    if (violations.length > 0) {
+      const statuses = [...new Set(violations.map((v) => v.status))];
+      console.log(`[ViolationsMain] Statuses before filtering: ${statuses.join(', ')}`);
+    }
+
     const filtered = violations.filter((violation) => {
-      // Hide resolved violations by default
-      if (filters.statuses.length === 0 && violation.status.toLowerCase() === 'resolved') {
-        return false;
-      }
+      // Note: We no longer auto-hide "Resolved" status violations here.
+      // The tab selection (active vs resolved) already determines which Google Sheet tab to fetch from.
+      // Users can use the status dropdown to filter by specific statuses if needed.
 
       // Card filter - "Needs Your Action"
       if (cardFilter === 'needsAction') {
@@ -124,6 +130,13 @@ export function ViolationsMain({ subdomain, onViewCase }: ViolationsMainProps) {
 
       return true;
     });
+
+    // Debug: log filtered result
+    console.log(`[ViolationsMain] Filtered violations count: ${filtered.length}`);
+    if (filtered.length !== violations.length) {
+      const filteredOut = violations.length - filtered.length;
+      console.log(`[ViolationsMain] ${filteredOut} violations were filtered out`);
+    }
 
     return filtered;
   }, [violations, filters, cardFilter]);
@@ -238,6 +251,8 @@ export function ViolationsMain({ subdomain, onViewCase }: ViolationsMainProps) {
             { value: 'Submitted', label: 'Submitted' },
             { value: 'Waiting on Client', label: 'Waiting on Client' },
             { value: 'Denied', label: 'Denied' },
+            { value: 'Resolved', label: 'Resolved' },
+            { value: 'Review Resolved', label: 'Review Resolved' },
           ]}
         />
       </div>
