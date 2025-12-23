@@ -38,6 +38,8 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
   try {
     const sheets = getGoogleSheetsClient();
 
+    console.log(`[getTenantBySubdomain] Looking up subdomain: "${subdomain}"`);
+
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: CLIENT_MAPPING_SHEET_ID,
       range: `'All Seller Information'!A:N`,
@@ -45,12 +47,15 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
 
     const rows = response.data.values;
     if (!rows || rows.length < 2) {
+      console.log(`[getTenantBySubdomain] No data rows found in mapping sheet`);
       return null;
     }
 
     // Build expected subdomain URL for matching against Column L
     const expectedSubdomainUrl = `${subdomain}.sellercentry.com`;
     const subdomainLower = subdomain.toLowerCase();
+
+    console.log(`[getTenantBySubdomain] Searching ${rows.length - 1} rows for: "${expectedSubdomainUrl}" or store name "${subdomainLower}"`);
 
     // Find the row matching the subdomain
     // Primary: Column L (row[11]) contains full subdomain URL like "alpha-daily-deals.sellercentry.com"
@@ -62,7 +67,7 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
       const columnA = (row[0] || '').toString().toLowerCase();
 
       if (columnL === expectedSubdomainUrl || columnA === subdomainLower) {
-        return {
+        const tenant = {
           storeName: row[0] || '',
           merchantId: row[1] || '',
           email: row[2] || '',
@@ -76,12 +81,16 @@ export async function getTenantBySubdomain(subdomain: string): Promise<Tenant | 
           subdomain: row[11] || `${columnA}.sellercentry.com`,
           documentFolderUrl: row[13] || undefined,
         };
+        console.log(`[getTenantBySubdomain] Found tenant: "${tenant.storeName}" (matched via ${columnL === expectedSubdomainUrl ? 'Column L' : 'Column A'})`);
+        console.log(`[getTenantBySubdomain] Sheet URL: ${tenant.sheetUrl ? tenant.sheetUrl.substring(0, 60) + '...' : 'MISSING!'}`);
+        return tenant;
       }
     }
 
+    console.log(`[getTenantBySubdomain] No match found for subdomain "${subdomain}"`);
     return null;
   } catch (error) {
-    console.error('Error fetching tenant:', error);
+    console.error('[getTenantBySubdomain] Error fetching tenant:', error);
     throw error;
   }
 }
@@ -119,11 +128,16 @@ export async function getViolations(
   tab: 'active' | 'resolved' = 'active'
 ): Promise<Violation[]> {
   try {
+    console.log(`[getViolations] Fetching ${tab} violations for "${tenant.storeName}"`);
+    console.log(`[getViolations] Sheet URL: ${tenant.sheetUrl}`);
+
     const sheetId = extractSheetId(tenant.sheetUrl);
     if (!sheetId) {
-      console.error('Invalid sheet URL:', tenant.sheetUrl);
+      console.error(`[getViolations] FAILED: Invalid sheet URL format. Could not extract sheet ID from: "${tenant.sheetUrl}"`);
       return [];
     }
+
+    console.log(`[getViolations] Extracted sheet ID: ${sheetId}`);
 
     const sheets = getGoogleSheetsClient();
 
