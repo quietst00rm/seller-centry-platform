@@ -324,8 +324,11 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
 
     const rows = response.data.values;
     if (!rows || rows.length < 2) {
+      console.log(`[getAccountsByEmail] No data rows found for email: ${email}`);
       return [];
     }
+
+    console.log(`[getAccountsByEmail] Searching for email: ${email} in ${rows.length - 1} rows`);
 
     const emailLower = email.toLowerCase();
     const accounts: { subdomain: string; storeName: string }[] = [];
@@ -340,13 +343,34 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
         const storeName = (row[0] || '').toString().trim();
         const columnL = (row[11] || '').toString().trim();
 
-        // Extract subdomain
+        console.log(`[getAccountsByEmail] Found match at row ${i + 1}: storeName="${storeName}", columnL="${columnL}"`);
+
+        // Extract subdomain from column L (could be various formats)
         let subdomain = '';
-        if (columnL && columnL.includes('.sellercentry.com')) {
-          subdomain = columnL.replace('.sellercentry.com', '');
-        } else if (storeName) {
+        if (columnL) {
+          // Handle full URL: https://subdomain.sellercentry.com
+          if (columnL.includes('://')) {
+            const match = columnL.match(/https?:\/\/([^.]+)\.sellercentry\.com/);
+            if (match) {
+              subdomain = match[1];
+            }
+          }
+          // Handle domain format: subdomain.sellercentry.com
+          else if (columnL.includes('.sellercentry.com')) {
+            subdomain = columnL.replace('.sellercentry.com', '').trim();
+          }
+          // Handle plain subdomain (no domain suffix)
+          else if (columnL && !columnL.includes(' ') && !columnL.includes('.')) {
+            subdomain = columnL.toLowerCase();
+          }
+        }
+
+        // Fallback to store name if no subdomain found
+        if (!subdomain && storeName) {
           subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
         }
+
+        console.log(`[getAccountsByEmail] Extracted subdomain: "${subdomain}"`);
 
         if (subdomain && !seenSubdomains.has(subdomain)) {
           seenSubdomains.add(subdomain);
@@ -355,6 +379,7 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
       }
     }
 
+    console.log(`[getAccountsByEmail] Found ${accounts.length} accounts for ${email}:`, accounts);
     return accounts;
   } catch (error) {
     console.error('Error fetching accounts by email:', error);

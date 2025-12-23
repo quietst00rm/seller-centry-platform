@@ -26,8 +26,12 @@ export function useUserAccounts(): UseUserAccountsReturn {
         }
 
         const data = await response.json();
+        console.log('[useUserAccounts] API response:', data);
         if (data.success && data.data?.accounts) {
+          console.log(`[useUserAccounts] Setting ${data.data.accounts.length} accounts:`, data.data.accounts);
           setAccounts(data.data.accounts);
+        } else {
+          console.log('[useUserAccounts] No accounts in response or request failed');
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch accounts');

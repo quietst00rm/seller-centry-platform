@@ -52,6 +52,8 @@ export async function GET(request: NextRequest) {
       getAccountsByEmail(userEmail),
     ]);
 
+    console.log(`[user-subdomain API] User: ${userEmail}, Found ${accounts.length} accounts:`, accounts);
+
     return NextResponse.json({
       success: true,
       data: {
