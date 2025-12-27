@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import type { Tenant, Violation, ViolationStatus } from '@/types';
+import type { Tenant, Violation, ViolationStatus, ClientOverview } from '@/types';
 
 // Client Mapping Sheet ID
 const CLIENT_MAPPING_SHEET_ID = '1p-J1x9B6UlaUNkULjx8YMXRpqKVaD1vRnkOjYTD1qMc';
@@ -390,6 +390,228 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
     return accounts;
   } catch (error) {
     console.error('Error fetching accounts by email:', error);
+    throw error;
+  }
+}
+
+// Get all clients with their metrics for the team dashboard
+export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    // Fetch all data from master sheet
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: CLIENT_MAPPING_SHEET_ID,
+      range: `'All Seller Information'!A:N`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length < 2) {
+      return [];
+    }
+
+    const clients: ClientOverview[] = [];
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Process each row (skip header)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const storeName = (row[0] || '').toString().trim();
+
+      // Skip empty rows
+      if (!storeName) continue;
+
+      const sheetUrl = row[3] || '';
+      const columnL = (row[11] || '').toString().trim();
+
+      // Extract subdomain
+      let subdomain = '';
+      if (columnL) {
+        if (columnL.includes('://')) {
+          const match = columnL.match(/https?:\/\/([^.]+)\.sellercentry\.com/);
+          if (match) subdomain = match[1];
+        } else if (columnL.includes('.sellercentry.com')) {
+          subdomain = columnL.replace('.sellercentry.com', '').trim();
+        } else if (!columnL.includes(' ') && !columnL.includes('.')) {
+          subdomain = columnL.toLowerCase();
+        }
+      }
+      if (!subdomain) {
+        subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
+      }
+
+      // Use master sheet data for basic metrics
+      // Column G (index 6) has violations last 2 days - use as approximation for 48h
+      const violations2Days = parseInt(row[6]) || 0;
+      // Column F (index 5) has violations last 7 days - we'll calculate 72h from individual sheet
+      const atRiskSales = parseFloat(row[7]?.replace(/[$,]/g, '')) || 0;
+      const highImpactCount = parseInt(row[8]) || 0;
+      const resolvedTotal = parseInt(row[9]) || 0;
+
+      // For detailed metrics (48h, 72h, resolved this month), we need to fetch individual sheets
+      // This will be done asynchronously to avoid blocking
+      const clientData: ClientOverview = {
+        storeName,
+        subdomain,
+        email: row[2] || '',
+        sheetUrl,
+        violations48h: violations2Days, // Approximation from master sheet
+        violations72h: 0, // Will be calculated from individual sheet
+        resolvedThisMonth: 0, // Will be calculated from individual sheet
+        resolvedTotal,
+        highImpactCount,
+        atRiskSales,
+      };
+
+      clients.push(clientData);
+    }
+
+    // Fetch detailed metrics for each client in parallel (with concurrency limit)
+    const CONCURRENCY_LIMIT = 5;
+    const clientChunks: ClientOverview[][] = [];
+    for (let i = 0; i < clients.length; i += CONCURRENCY_LIMIT) {
+      clientChunks.push(clients.slice(i, i + CONCURRENCY_LIMIT));
+    }
+
+    for (const chunk of clientChunks) {
+      await Promise.all(
+        chunk.map(async (client) => {
+          try {
+            const sheetId = extractSheetId(client.sheetUrl);
+            if (!sheetId) return;
+
+            // Fetch active violations for 48h/72h counts
+            const activeResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: `'All Current Violations'!A:B`,
+            }).catch(() => null);
+
+            if (activeResponse?.data.values && activeResponse.data.values.length > 1) {
+              const violations = activeResponse.data.values.slice(1);
+              const now48hAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+              const now72hAgo = new Date(now.getTime() - 72 * 60 * 60 * 1000);
+
+              let count48h = 0;
+              let count72h = 0;
+
+              for (const violation of violations) {
+                const importedAt = violation[1]; // Column B is ImportedAt
+                if (!importedAt) continue;
+
+                const importedDate = new Date(importedAt);
+                if (isNaN(importedDate.getTime())) continue;
+
+                if (importedDate >= now48hAgo) count48h++;
+                if (importedDate >= now72hAgo) count72h++;
+              }
+
+              client.violations48h = count48h;
+              client.violations72h = count72h;
+            }
+
+            // Fetch resolved violations for this month count
+            const resolvedResponse = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: `'All Resolved Violations'!A:N`,
+            }).catch(() => null);
+
+            if (resolvedResponse?.data.values && resolvedResponse.data.values.length > 1) {
+              const resolved = resolvedResponse.data.values.slice(1);
+              let resolvedThisMonth = 0;
+
+              for (const violation of resolved) {
+                const dateResolved = violation[13]; // Column N is DateResolved
+                if (!dateResolved) continue;
+
+                const resolvedDate = new Date(dateResolved);
+                if (isNaN(resolvedDate.getTime())) continue;
+
+                if (
+                  resolvedDate.getMonth() === currentMonth &&
+                  resolvedDate.getFullYear() === currentYear
+                ) {
+                  resolvedThisMonth++;
+                }
+              }
+
+              client.resolvedThisMonth = resolvedThisMonth;
+            }
+          } catch (error) {
+            console.error(`Error fetching metrics for ${client.storeName}:`, error);
+            // Keep default values on error
+          }
+        })
+      );
+    }
+
+    console.log(`[getAllClientsWithMetrics] Returning ${clients.length} clients`);
+    return clients;
+  } catch (error) {
+    console.error('Error fetching all clients:', error);
+    throw error;
+  }
+}
+
+// Get basic client list without detailed metrics (faster, for initial load)
+export async function getAllClientsBasic(): Promise<ClientOverview[]> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: CLIENT_MAPPING_SHEET_ID,
+      range: `'All Seller Information'!A:N`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length < 2) {
+      return [];
+    }
+
+    const clients: ClientOverview[] = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const storeName = (row[0] || '').toString().trim();
+
+      if (!storeName) continue;
+
+      const columnL = (row[11] || '').toString().trim();
+
+      let subdomain = '';
+      if (columnL) {
+        if (columnL.includes('://')) {
+          const match = columnL.match(/https?:\/\/([^.]+)\.sellercentry\.com/);
+          if (match) subdomain = match[1];
+        } else if (columnL.includes('.sellercentry.com')) {
+          subdomain = columnL.replace('.sellercentry.com', '').trim();
+        } else if (!columnL.includes(' ') && !columnL.includes('.')) {
+          subdomain = columnL.toLowerCase();
+        }
+      }
+      if (!subdomain) {
+        subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
+      }
+
+      clients.push({
+        storeName,
+        subdomain,
+        email: row[2] || '',
+        sheetUrl: row[3] || '',
+        violations48h: parseInt(row[6]) || 0, // Using 2-day column as approximation
+        violations72h: parseInt(row[5]) || 0, // Using 7-day column as approximation
+        resolvedThisMonth: 0, // Not available from master sheet
+        resolvedTotal: parseInt(row[9]) || 0,
+        highImpactCount: parseInt(row[8]) || 0,
+        atRiskSales: parseFloat(row[7]?.replace(/[$,]/g, '')) || 0,
+      });
+    }
+
+    console.log(`[getAllClientsBasic] Returning ${clients.length} clients`);
+    return clients;
+  } catch (error) {
+    console.error('Error fetching basic clients:', error);
     throw error;
   }
 }
