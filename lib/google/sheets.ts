@@ -132,6 +132,10 @@ export async function getViolations(
       ? ['All Current Violations', 'Current Violations', 'Active Violations', 'All Active Violations', 'Open Violations']
       : ['All Resolved Violations', 'Resolved Violations', 'Closed Violations', 'All Closed Violations'];
 
+    // For active tab, read A:O to include Docs Needed column (Column O)
+    // For resolved tab, read A:N as before
+    const rangeEnd = tab === 'active' ? 'O' : 'N';
+
     let rows: string[][] | undefined;
     let usedTabName: string | null = null;
 
@@ -140,7 +144,7 @@ export async function getViolations(
       try {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
-          range: `'${tabName}'!A:N`,
+          range: `'${tabName}'!A:${rangeEnd}`,
         });
         rows = response.data.values as string[][] | undefined;
         usedTabName = tabName;
@@ -204,6 +208,7 @@ export async function getViolations(
         status: tab === 'resolved' ? 'Resolved' : parseViolationStatus(row[11]),
         notes: row[12] || '',
         dateResolved: tab === 'resolved' ? row[13] || '' : undefined,
+        docsNeeded: tab === 'active' ? row[14] || '' : undefined,
       };
 
       violations.push(violation);
