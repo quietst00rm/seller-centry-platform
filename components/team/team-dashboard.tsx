@@ -225,42 +225,38 @@ export function TeamDashboard() {
 
   // Main content
   return (
-    <main className="flex-1 px-6 py-8 w-full max-w-[1920px] mx-auto">
+    <main className="flex-1 px-8 py-8 w-full max-w-[1920px] mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-white mb-1">Client Overview</h1>
-          <p className="text-sm text-gray-400">{clients.length} clients active</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">Client Overview</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Monitoring {clients.length} active client accounts</p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Data freshness indicator */}
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                freshness.status === 'fresh'
-                  ? 'bg-emerald-500 animate-pulse'
-                  : freshness.status === 'stale'
-                    ? 'bg-amber-500'
-                    : 'bg-red-500'
-              }`}
-            />
-            <span className={`${
+          {/* Live Updates indicator */}
+          <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border ${
+            freshness.status === 'fresh'
+              ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/30'
+              : freshness.status === 'stale'
+                ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800/30'
+                : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/30'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
               freshness.status === 'fresh'
-                ? 'text-emerald-400'
+                ? 'bg-emerald-500 animate-pulse'
                 : freshness.status === 'stale'
-                  ? 'text-amber-400'
-                  : 'text-red-400'
-            }`}>
-              {freshness.message}
-            </span>
+                  ? 'bg-amber-500'
+                  : 'bg-red-500'
+            }`} />
+            {freshness.status === 'fresh' ? 'Live Updates Active' : freshness.message}
           </div>
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1f262e] hover:bg-[#2d333b] text-gray-300 rounded text-sm font-medium transition-colors border border-[#2d333b] disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#161b22] hover:bg-gray-50 dark:hover:bg-[#1f262e] text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-all border border-gray-200 dark:border-[#30363d] shadow-sm hover:shadow disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
           </button>
         </div>
       </div>
