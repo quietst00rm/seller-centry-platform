@@ -42,6 +42,9 @@ app/
 │   └── team/
 │       ├── clients/     # GET all clients with metrics (team tool)
 │       └── violations/  # GET violations for team view (includes Column O)
+│           ├── update/      # PATCH single violation update
+│           ├── bulk-update/ # PATCH multiple violations
+│           └── resolve/     # POST move violation to resolved
 ├── auth/callback/       # OAuth callback handler
 ├── s/[subdomain]/       # Dynamic subdomain dashboard route
 ├── team/                # Internal team tool (team.sellercentry.com)
