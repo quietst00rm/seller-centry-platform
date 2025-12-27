@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, FileText, ChevronDown, ChevronUp, Upload, Mail, Info } from 'lucide-react';
+import { ExternalLink, FileText, ChevronDown, ChevronUp, Upload, Mail, Info, Download, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from '@/hooks/use-toast';
 import type { Violation } from '@/types';
 
 interface DocumentsNeededTabProps {
   violations: Violation[];
   documentFolderUrl?: string;
+  subdomain?: string;
 }
 
 // Document type definitions with requirements
@@ -173,12 +175,76 @@ function DocumentCard({ violation, docsNeeded }: DocumentCardProps) {
   );
 }
 
-export function DocumentsNeededTab({ violations, documentFolderUrl }: DocumentsNeededTabProps) {
+export function DocumentsNeededTab({ violations, documentFolderUrl, subdomain }: DocumentsNeededTabProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   // Filter violations to only those with docsNeeded populated
   const violationsWithDocs = violations.filter((v) => {
     const docs = parseDocsNeeded(v.docsNeeded);
     return docs.length > 0;
   });
+
+  // Handle PDF download
+  const handleDownloadPDF = async () => {
+    if (!subdomain) {
+      toast({
+        title: 'Error',
+        description: 'Unable to generate PDF - subdomain not available',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/export/documents-pdf?subdomain=${encodeURIComponent(subdomain)}`);
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to generate PDF');
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'DocumentsNeeded.pdf';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: 'PDF Downloaded',
+        description: 'Your document requirements PDF has been downloaded.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Download Failed',
+        description: error instanceof Error ? error.message : 'Failed to download PDF',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // Handle email button click
+  const handleEmailClick = () => {
+    window.location.href = 'mailto:info@sellercentry.com?subject=Document%20Submission';
+  };
 
   // Empty state
   if (violationsWithDocs.length === 0) {
@@ -222,22 +288,42 @@ export function DocumentsNeededTab({ violations, documentFolderUrl }: DocumentsN
               ) : null}
               <Button
                 variant="outline"
-                asChild
+                onClick={handleEmailClick}
                 className="border-border hover:border-orange-500/50"
               >
-                <a href="mailto:info@sellercentry.com?subject=Document%20Submission">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Email Documents
-                </a>
+                <Mail className="h-4 w-4 mr-2" />
+                Email Documents
               </Button>
             </div>
           </div>
-          {!documentFolderUrl && (
-            <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+          {/* Download PDF and info row */}
+          <div className="mt-4 pt-4 border-t border-border/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Info className="h-3 w-3" />
-              No Google Drive folder configured. Please email documents to info@sellercentry.com
+              {documentFolderUrl
+                ? 'Download the PDF to see all document requirements in detail.'
+                : 'No Google Drive folder configured. Please email documents to info@sellercentry.com'}
             </p>
-          )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadPDF}
+              disabled={isDownloading}
+              className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

@@ -120,6 +120,7 @@ export function ViolationsTabManager({ subdomain, onViewCase, documentFolderUrl 
           <DocumentsNeededTab
             violations={activeViolations}
             documentFolderUrl={documentFolderUrl}
+            subdomain={subdomain}
           />
         </TabsContent>
       </Tabs>
