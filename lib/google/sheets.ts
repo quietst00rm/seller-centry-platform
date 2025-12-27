@@ -217,6 +217,101 @@ export async function getViolations(
   }
 }
 
+// Get violations for team view (includes Column O - Docs Needed for active violations)
+export async function getViolationsForTeam(
+  tenant: Tenant,
+  tab: 'active' | 'resolved' = 'active'
+): Promise<Violation[]> {
+  try {
+    const sheetId = extractSheetId(tenant.sheetUrl);
+    if (!sheetId) {
+      console.error('Invalid sheet URL:', tenant.sheetUrl);
+      return [];
+    }
+
+    const sheets = getGoogleSheetsClient();
+
+    // Tab name variations to try
+    const tabNameVariations = tab === 'active'
+      ? ['All Current Violations', 'Current Violations', 'Active Violations', 'All Active Violations', 'Open Violations']
+      : ['All Resolved Violations', 'Resolved Violations', 'Closed Violations', 'All Closed Violations'];
+
+    // For active tab, read A:O to include Docs Needed column
+    // For resolved tab, read A:N as before
+    const rangeEnd = tab === 'active' ? 'O' : 'N';
+
+    let rows: string[][] | undefined;
+    let usedTabName: string | null = null;
+
+    for (const tabName of tabNameVariations) {
+      try {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `'${tabName}'!A:${rangeEnd}`,
+        });
+        rows = response.data.values as string[][] | undefined;
+        usedTabName = tabName;
+        console.log(`[getViolationsForTeam] Found tab "${tabName}" for ${tab} violations`);
+        break;
+      } catch (tabError: unknown) {
+        const errorMessage = tabError instanceof Error ? tabError.message : String(tabError);
+        if (errorMessage.includes('Unable to parse range') || errorMessage.includes('not found')) {
+          console.log(`[getViolationsForTeam] Tab "${tabName}" not found, trying next...`);
+          continue;
+        }
+        throw tabError;
+      }
+    }
+
+    if (!usedTabName || !rows) {
+      console.error(`[getViolationsForTeam] No valid tab found for ${tab} violations. Tried: ${tabNameVariations.join(', ')}`);
+      return [];
+    }
+
+    if (rows.length < 2) {
+      console.log(`[getViolationsForTeam] Tab "${usedTabName}" exists but has no data rows`);
+      return [];
+    }
+
+    const violations: Violation[] = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+
+      // Skip empty rows
+      if (!row || (!row[0] && !row[4])) {
+        continue;
+      }
+
+      const violation: Violation = {
+        id: row[0] || `gen-${i}`,
+        importedAt: row[1] || '',
+        reason: row[2] || '',
+        date: row[3] || '',
+        asin: row[4] || '',
+        productTitle: row[5] || '',
+        atRiskSales: parseFloat(row[6]?.replace(/[$,]/g, '')) || 0,
+        actionTaken: row[7] || '',
+        ahrImpact: parseAhrImpact(row[8]),
+        nextSteps: row[9] || '',
+        options: row[10] || '',
+        status: tab === 'resolved' ? 'Resolved' : parseViolationStatus(row[11]),
+        notes: row[12] || '',
+        dateResolved: tab === 'resolved' ? row[13] || '' : undefined,
+        docsNeeded: tab === 'active' ? row[14] || '' : undefined,
+      };
+
+      violations.push(violation);
+    }
+
+    console.log(`[getViolationsForTeam] Returning ${violations.length} ${tab} violations from "${usedTabName}"`);
+    return violations;
+  } catch (error) {
+    console.error('Error fetching team violations:', error);
+    throw error;
+  }
+}
+
 // Filter violations based on criteria
 export function filterViolations(
   violations: Violation[],

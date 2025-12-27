@@ -39,12 +39,15 @@ app/
 │   ├── tenant/          # GET tenant info from Google Sheets
 │   ├── violations/      # GET violations data
 │   ├── ticket/          # POST support tickets
-│   └── team/clients/    # GET all clients with metrics (team tool)
+│   └── team/
+│       ├── clients/     # GET all clients with metrics (team tool)
+│       └── violations/  # GET violations for team view (includes Column O)
 ├── auth/callback/       # OAuth callback handler
 ├── s/[subdomain]/       # Dynamic subdomain dashboard route
 ├── team/                # Internal team tool (team.sellercentry.com)
 │   ├── layout.tsx       # Team layout with auth check
-│   └── page.tsx         # Team dashboard landing page
+│   ├── page.tsx         # Team dashboard with client table
+│   └── client/[subdomain]/ # Per-client violation view
 ├── globals.css          # Global styles (dark theme)
 ├── layout.tsx           # Root layout
 └── page.tsx             # Landing page (root domain)
@@ -59,8 +62,11 @@ components/
 │   ├── violation-modal.tsx   # Detail modal
 │   └── submit-ticket-modal.tsx
 ├── team/                # Internal team tool components
-│   ├── client-table.tsx     # Sortable client overview table
-│   └── team-dashboard.tsx   # Main dashboard with data fetching
+│   ├── client-table.tsx              # Sortable client overview table
+│   ├── team-dashboard.tsx            # Main dashboard with data fetching
+│   ├── violations-table.tsx          # Per-client violations table
+│   ├── violation-detail-modal.tsx    # Violation detail modal
+│   └── client-violations-dashboard.tsx # Client detail page component
 └── ui/                  # shadcn/ui components
 
 lib/
