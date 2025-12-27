@@ -21,7 +21,7 @@ function getGoogleSheetsClient() {
 
   const auth = new google.auth.GoogleAuth({
     credentials,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
   return google.sheets({ version: 'v4', auth });
@@ -709,4 +709,329 @@ export async function getAllClientsBasic(): Promise<ClientOverview[]> {
     console.error('Error fetching basic clients:', error);
     throw error;
   }
+}
+
+// ============================================
+// WRITE OPERATIONS - Team Tool Only
+// ============================================
+
+// Column mapping for violation updates
+const VIOLATION_COLUMN_MAP: Record<string, string> = {
+  actionTaken: 'H',
+  ahrImpact: 'I',
+  nextSteps: 'J',
+  options: 'K',
+  status: 'L',
+  notes: 'M',
+  docsNeeded: 'O',
+};
+
+// Type for violation updates
+export interface ViolationUpdate {
+  actionTaken?: string;
+  ahrImpact?: 'High' | 'Low' | 'No impact';
+  nextSteps?: string;
+  options?: string;
+  status?: ViolationStatus;
+  notes?: string;
+  docsNeeded?: string;
+}
+
+// Export extractSheetId for use by API routes
+export { extractSheetId };
+
+// Custom error class for Google Sheets operations
+export class SheetsError extends Error {
+  constructor(
+    message: string,
+    public code: 'PERMISSION_DENIED' | 'NOT_FOUND' | 'RATE_LIMITED' | 'UNKNOWN',
+    public details?: string
+  ) {
+    super(message);
+    this.name = 'SheetsError';
+  }
+}
+
+// Parse Google API errors into user-friendly messages
+function handleSheetsError(error: unknown): never {
+  if (error instanceof SheetsError) {
+    throw error;
+  }
+
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorObj = error as { code?: number; status?: number };
+
+  if (errorObj.code === 403 || errorObj.status === 403 || errorMessage.includes('403')) {
+    throw new SheetsError(
+      'Permission denied. The service account may not have write access to this sheet.',
+      'PERMISSION_DENIED',
+      errorMessage
+    );
+  }
+
+  if (errorObj.code === 404 || errorObj.status === 404 || errorMessage.includes('not found')) {
+    throw new SheetsError(
+      'Sheet or range not found. The tab name or cell reference may be incorrect.',
+      'NOT_FOUND',
+      errorMessage
+    );
+  }
+
+  if (errorObj.code === 429 || errorObj.status === 429 || errorMessage.includes('rate')) {
+    throw new SheetsError(
+      'Rate limit exceeded. Please wait a moment and try again.',
+      'RATE_LIMITED',
+      errorMessage
+    );
+  }
+
+  throw new SheetsError(
+    'An unexpected error occurred while updating the sheet.',
+    'UNKNOWN',
+    errorMessage
+  );
+}
+
+// Find a row by Violation ID in a specific tab
+export async function findRowByViolationId(
+  sheetId: string,
+  tabName: string,
+  violationId: string
+): Promise<number | null> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `'${tabName}'!A:A`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    // Find the row (1-indexed, skip header at row 1)
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === violationId) {
+        return i + 1; // Convert to 1-indexed row number
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error finding row for violation ${violationId}:`, error);
+    handleSheetsError(error);
+  }
+}
+
+// Update a violation with specific field changes
+export async function updateViolation(
+  sheetId: string,
+  tabName: string,
+  rowNumber: number,
+  updates: ViolationUpdate
+): Promise<void> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    // Build batch update requests for each field
+    const updatePromises: Promise<unknown>[] = [];
+
+    for (const [field, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+
+      const column = VIOLATION_COLUMN_MAP[field];
+      if (!column) {
+        console.warn(`Unknown field: ${field}`);
+        continue;
+      }
+
+      const range = `'${tabName}'!${column}${rowNumber}`;
+      console.log(`[updateViolation] Updating ${range} to "${value}"`);
+
+      updatePromises.push(
+        sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [[value]],
+          },
+        })
+      );
+    }
+
+    if (updatePromises.length === 0) {
+      console.log('[updateViolation] No updates to apply');
+      return;
+    }
+
+    await Promise.all(updatePromises);
+    console.log(`[updateViolation] Successfully updated ${updatePromises.length} fields at row ${rowNumber}`);
+  } catch (error) {
+    console.error(`Error updating violation at row ${rowNumber}:`, error);
+    handleSheetsError(error);
+  }
+}
+
+// Read a full row of violation data (columns A through N)
+export async function readViolationRow(
+  sheetId: string,
+  tabName: string,
+  rowNumber: number
+): Promise<string[] | null> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `'${tabName}'!A${rowNumber}:N${rowNumber}`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return rows[0];
+  } catch (error) {
+    console.error(`Error reading violation at row ${rowNumber}:`, error);
+    handleSheetsError(error);
+  }
+}
+
+// Append a row to a tab
+export async function appendRow(
+  sheetId: string,
+  tabName: string,
+  rowData: string[]
+): Promise<void> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: `'${tabName}'!A:N`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [rowData],
+      },
+    });
+
+    console.log(`[appendRow] Successfully appended row to ${tabName}`);
+  } catch (error) {
+    console.error(`Error appending row to ${tabName}:`, error);
+    handleSheetsError(error);
+  }
+}
+
+// Delete a row from a tab (requires getting sheet gid first)
+export async function deleteRow(
+  sheetId: string,
+  tabName: string,
+  rowNumber: number
+): Promise<void> {
+  try {
+    const sheets = getGoogleSheetsClient();
+
+    // First, get the sheet metadata to find the sheet ID (gid)
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: sheetId,
+      fields: 'sheets.properties',
+    });
+
+    const sheet = spreadsheet.data.sheets?.find(
+      (s) => s.properties?.title === tabName
+    );
+
+    if (!sheet || sheet.properties?.sheetId === undefined) {
+      throw new SheetsError(
+        `Tab "${tabName}" not found in spreadsheet`,
+        'NOT_FOUND'
+      );
+    }
+
+    const sheetGid = sheet.properties.sheetId;
+
+    // Delete the row using batchUpdate
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: sheetGid,
+                dimension: 'ROWS',
+                startIndex: rowNumber - 1, // 0-indexed
+                endIndex: rowNumber, // Exclusive
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    console.log(`[deleteRow] Successfully deleted row ${rowNumber} from ${tabName}`);
+  } catch (error) {
+    console.error(`Error deleting row ${rowNumber} from ${tabName}:`, error);
+    handleSheetsError(error);
+  }
+}
+
+// Resolve a violation: move from active tab to resolved tab
+export async function resolveViolation(
+  sheetId: string,
+  activeTabName: string,
+  resolvedTabName: string,
+  rowNumber: number
+): Promise<void> {
+  try {
+    // Read the current row data (A through N)
+    const rowData = await readViolationRow(sheetId, activeTabName, rowNumber);
+    if (!rowData) {
+      throw new SheetsError(
+        'Could not read violation data',
+        'NOT_FOUND'
+      );
+    }
+
+    // Ensure we have at least 14 columns (A-N)
+    while (rowData.length < 14) {
+      rowData.push('');
+    }
+
+    // Set DateResolved (Column N, index 13) to current date
+    const today = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    rowData[13] = today;
+
+    // Append to resolved tab
+    await appendRow(sheetId, resolvedTabName, rowData);
+
+    // Delete from active tab
+    await deleteRow(sheetId, activeTabName, rowNumber);
+
+    console.log(`[resolveViolation] Successfully moved violation to resolved tab`);
+  } catch (error) {
+    console.error('Error resolving violation:', error);
+    if (error instanceof SheetsError) {
+      throw error;
+    }
+    handleSheetsError(error);
+  }
+}
+
+// Get the sheet ID for a client by subdomain
+export async function getClientSheetId(subdomain: string): Promise<string | null> {
+  const tenant = await getTenantBySubdomain(subdomain);
+  if (!tenant || !tenant.sheetUrl) {
+    return null;
+  }
+  return extractSheetId(tenant.sheetUrl);
 }
