@@ -626,9 +626,128 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
   }
 }
 
+// Helper function to calculate time-based violation counts from actual violation data
+function calculateViolationMetrics(violations: Violation[]): {
+  total: number;
+  last48h: number;
+  last7Days: number;
+  highImpact: number;
+  atRiskSales: number;
+} {
+  const now = new Date();
+  const cutoff48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+  const cutoff7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  let last48h = 0;
+  let last7Days = 0;
+  let highImpact = 0;
+  let atRiskSales = 0;
+
+  for (const violation of violations) {
+    // Use the violation date (Column D), not importedAt
+    const violationDate = new Date(violation.date);
+
+    if (!isNaN(violationDate.getTime())) {
+      if (violationDate >= cutoff48h) {
+        last48h++;
+      }
+      if (violationDate >= cutoff7Days) {
+        last7Days++;
+      }
+    }
+
+    if (violation.ahrImpact === 'High') {
+      highImpact++;
+    }
+
+    atRiskSales += violation.atRiskSales || 0;
+  }
+
+  return {
+    total: violations.length,
+    last48h,
+    last7Days,
+    highImpact,
+    atRiskSales,
+  };
+}
+
+// Helper function to fetch violations for a single client (for metrics calculation)
+async function fetchClientViolationsForMetrics(
+  sheetUrl: string,
+  tab: 'active' | 'resolved' = 'active'
+): Promise<Violation[]> {
+  try {
+    const sheetId = extractSheetId(sheetUrl);
+    if (!sheetId) {
+      return [];
+    }
+
+    const sheets = getGoogleSheetsClient();
+
+    const tabNameVariations = tab === 'active'
+      ? ['All Current Violations', 'Current Violations', 'Active Violations']
+      : ['All Resolved Violations', 'Resolved Violations'];
+
+    for (const tabName of tabNameVariations) {
+      try {
+        const response = await withRetry(
+          () => throttledRequest(() =>
+            sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: `'${tabName}'!A:N`,
+            })
+          ),
+          2, // Fewer retries for batch operations
+          500
+        );
+
+        const rows = response.data.values as string[][] | undefined;
+        if (!rows || rows.length < 2) {
+          return [];
+        }
+
+        const violations: Violation[] = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || (!row[0] && !row[4])) continue;
+
+          violations.push({
+            id: row[0] || `gen-${i}`,
+            importedAt: row[1] || '',
+            reason: row[2] || '',
+            date: row[3] || '',
+            asin: row[4] || '',
+            productTitle: row[5] || '',
+            atRiskSales: parseFloat(row[6]?.replace(/[$,]/g, '')) || 0,
+            actionTaken: row[7] || '',
+            ahrImpact: parseAhrImpact(row[8]),
+            nextSteps: row[9] || '',
+            options: row[10] || '',
+            status: tab === 'resolved' ? 'Resolved' : parseViolationStatus(row[11]),
+            notes: row[12] || '',
+            dateResolved: tab === 'resolved' ? row[13] || '' : undefined,
+            docsNeeded: tab === 'active' ? row[13] || '' : undefined,
+          });
+        }
+        return violations;
+      } catch (tabError: unknown) {
+        const errorMessage = tabError instanceof Error ? tabError.message : String(tabError);
+        if (errorMessage.includes('Unable to parse range') || errorMessage.includes('not found')) {
+          continue;
+        }
+        throw tabError;
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching client violations for metrics:', error);
+    return [];
+  }
+}
+
 // Get all clients with their metrics for the team dashboard
-// OPTIMIZED: Uses only master sheet data to avoid rate limits
-// The master sheet should be kept up-to-date with aggregated metrics
+// Fetches violations from each client's sheet to calculate accurate time-based counts
 export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
   // Check cache first
   const cached = getCachedClients();
@@ -639,7 +758,7 @@ export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
   try {
     const sheets = getGoogleSheetsClient();
 
-    // Single API call to fetch all data from master sheet
+    // First, get basic client info from master sheet
     const response = await withRetry(() =>
       throttledRequest(() =>
         sheets.spreadsheets.values.get({
@@ -654,20 +773,22 @@ export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
       return [];
     }
 
-    const clients: ClientOverview[] = [];
+    // Build list of clients with their sheet URLs
+    const clientsBasic: Array<{
+      storeName: string;
+      subdomain: string;
+      email: string;
+      sheetUrl: string;
+    }> = [];
 
-    // Process each row (skip header)
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       const storeName = (row[0] || '').toString().trim();
-
-      // Skip empty rows
       if (!storeName) continue;
 
       const sheetUrl = row[3] || '';
       const columnL = (row[11] || '').toString().trim();
 
-      // Extract subdomain from column L
       let subdomain = '';
       if (columnL) {
         if (columnL.includes('://')) {
@@ -683,40 +804,51 @@ export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
         subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
       }
 
-      // Use master sheet data for ALL metrics (no individual sheet fetches)
-      // Column E (index 4): Total violations (active)
-      // Column F (index 5): violations last 7 days
-      // Column G (index 6): violations last 2 days (use for 48h)
-      // Column H (index 7): at-risk sales
-      // Column I (index 8): high impact count
-      // Column J (index 9): resolved total
-      const activeCount = parseInt(row[4]) || 0;
-      const violations7Days = parseInt(row[5]) || 0;
-      const violations2Days = parseInt(row[6]) || 0;
-      const atRiskSales = parseFloat(row[7]?.replace(/[$,]/g, '')) || 0;
-      const highImpactCount = parseInt(row[8]) || 0;
-      const resolvedTotal = parseInt(row[9]) || 0;
-
-      // Estimate resolved this week as ~25% of monthly, which is ~10% of total
-      const resolvedThisWeek = Math.floor(resolvedTotal * 0.05);
-      // Estimate resolved this month as ~40% of total
-      const resolvedThisMonth = Math.floor(resolvedTotal * 0.1);
-
-      const clientData: ClientOverview = {
+      clientsBasic.push({
         storeName,
         subdomain,
         email: row[2] || '',
         sheetUrl,
-        violations48h: violations2Days,
-        violationsThisWeek: violations7Days,
-        resolvedThisMonth,
-        resolvedThisWeek,
-        activeViolations: activeCount,
-        highImpactCount,
-        atRiskSales,
-      };
+      });
+    }
 
-      clients.push(clientData);
+    // Fetch violations for each client and calculate metrics
+    // Process in batches to avoid rate limits
+    const clients: ClientOverview[] = [];
+    const batchSize = 5;
+
+    for (let i = 0; i < clientsBasic.length; i += batchSize) {
+      const batch = clientsBasic.slice(i, i + batchSize);
+
+      const batchResults = await Promise.all(
+        batch.map(async (client) => {
+          // Fetch active violations
+          const activeViolations = await fetchClientViolationsForMetrics(client.sheetUrl, 'active');
+          const activeMetrics = calculateViolationMetrics(activeViolations);
+
+          // Fetch resolved violations for resolved counts
+          const resolvedViolations = await fetchClientViolationsForMetrics(client.sheetUrl, 'resolved');
+          const resolvedMetrics = calculateViolationMetrics(resolvedViolations);
+
+          return {
+            ...client,
+            violations48h: activeMetrics.last48h,
+            violationsThisWeek: activeMetrics.last7Days,
+            resolvedThisMonth: resolvedMetrics.last7Days * 4, // Approximate monthly from weekly
+            resolvedThisWeek: resolvedMetrics.last7Days,
+            activeViolations: activeMetrics.total,
+            highImpactCount: activeMetrics.highImpact,
+            atRiskSales: activeMetrics.atRiskSales,
+          } as ClientOverview;
+        })
+      );
+
+      clients.push(...batchResults);
+
+      // Small delay between batches to avoid rate limiting
+      if (i + batchSize < clientsBasic.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
     }
 
     // Cache the results
@@ -729,74 +861,11 @@ export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
   }
 }
 
-// Get basic client list without detailed metrics (faster, for initial load)
-// Uses retry logic to handle rate limits
+// Get basic client list - now uses the same calculation as detailed
+// to ensure consistency with actual violation dates
 export async function getAllClientsBasic(): Promise<ClientOverview[]> {
-  try {
-    const sheets = getGoogleSheetsClient();
-
-    const response = await withRetry(
-      () => throttledRequest(() =>
-        sheets.spreadsheets.values.get({
-          spreadsheetId: CLIENT_MAPPING_SHEET_ID,
-          range: `'All Seller Information'!A:N`,
-        })
-      ),
-      3,
-      1000
-    );
-
-    const rows = response.data.values;
-    if (!rows || rows.length < 2) {
-      return [];
-    }
-
-    const clients: ClientOverview[] = [];
-
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      const storeName = (row[0] || '').toString().trim();
-
-      if (!storeName) continue;
-
-      const columnL = (row[11] || '').toString().trim();
-
-      let subdomain = '';
-      if (columnL) {
-        if (columnL.includes('://')) {
-          const match = columnL.match(/https?:\/\/([^.]+)\.sellercentry\.com/);
-          if (match) subdomain = match[1];
-        } else if (columnL.includes('.sellercentry.com')) {
-          subdomain = columnL.replace('.sellercentry.com', '').trim();
-        } else if (!columnL.includes(' ') && !columnL.includes('.')) {
-          subdomain = columnL.toLowerCase();
-        }
-      }
-      if (!subdomain) {
-        subdomain = storeName.toLowerCase().replace(/\s+/g, '-');
-      }
-
-      const resolvedTotal = parseInt(row[9]) || 0;
-      clients.push({
-        storeName,
-        subdomain,
-        email: row[2] || '',
-        sheetUrl: row[3] || '',
-        violations48h: parseInt(row[6]) || 0,
-        violationsThisWeek: parseInt(row[5]) || 0,
-        resolvedThisMonth: Math.floor(resolvedTotal * 0.1),
-        resolvedThisWeek: Math.floor(resolvedTotal * 0.05),
-        activeViolations: parseInt(row[4]) || 0,
-        highImpactCount: parseInt(row[8]) || 0,
-        atRiskSales: parseFloat(row[7]?.replace(/[$,]/g, '')) || 0,
-      });
-    }
-
-    return clients;
-  } catch (error) {
-    console.error('Error fetching basic clients:', error);
-    throw error;
-  }
+  // Use the same function for consistency - both should calculate from actual violation data
+  return getAllClientsWithMetrics();
 }
 
 // ============================================

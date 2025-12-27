@@ -185,7 +185,18 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
     window.open(`https://${subdomain}.sellercentry.com`, '_blank', 'noopener,noreferrer');
   };
 
+  // Format currency for table cells - full format: $###,###
   const formatCurrency = (value: number): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  // Format currency for KPI cards - abbreviated: $17.2M
+  const formatCurrencyAbbrev = (value: number): string => {
     if (value >= 1000000) {
       return `$${(value / 1000000).toFixed(1)}M`;
     }
@@ -248,7 +259,7 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
         />
         <KpiCard
           label="At-Risk Revenue"
-          value={formatCurrency(kpiMetrics.totalAtRisk)}
+          value={formatCurrencyAbbrev(kpiMetrics.totalAtRisk)}
           icon={DollarSign}
           labelColor="text-red-600 dark:text-red-500"
           iconBgColor="bg-red-50 dark:bg-red-900/20"
