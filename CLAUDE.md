@@ -41,6 +41,9 @@ app/
 │   └── ticket/          # POST support tickets
 ├── auth/callback/       # OAuth callback handler
 ├── s/[subdomain]/       # Dynamic subdomain dashboard route
+├── team/                # Internal team tool (team.sellercentry.com)
+│   ├── layout.tsx       # Team layout with auth check
+│   └── page.tsx         # Team dashboard landing page
 ├── globals.css          # Global styles (dark theme)
 ├── layout.tsx           # Root layout
 └── page.tsx             # Landing page (root domain)
@@ -57,6 +60,8 @@ components/
 └── ui/                  # shadcn/ui components
 
 lib/
+├── auth/
+│   └── team.ts          # Team authorization utilities
 ├── google/sheets.ts     # Google Sheets API integration
 ├── supabase/
 │   ├── client.ts        # Browser client
@@ -171,6 +176,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
 GOOGLE_SERVICE_ACCOUNT_KEY=<stringified_json>
 NEXT_PUBLIC_ROOT_DOMAIN=localhost:3000  # or sellercentry.com
 RESEND_API_KEY=<resend_key>  # Optional for local dev
+TEAM_EMAILS=<comma_separated_emails>  # Optional, defaults to hardcoded list
 ```
 
 ## Google Sheets Structure

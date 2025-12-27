@@ -75,6 +75,9 @@ function getRootDomain(request: NextRequest): string {
 // These routes exist at the app root level, not under /s/[subdomain]
 const publicRoutes = ['/login', '/auth/callback', '/auth/setup-password', '/forgot-password', '/unauthorized'];
 
+// Special subdomain for internal team tool
+const TEAM_SUBDOMAIN = 'team';
+
 // Routes that are API routes (handled separately)
 const isApiRoute = (pathname: string) => pathname.startsWith('/api');
 
@@ -118,7 +121,46 @@ export async function middleware(request: NextRequest) {
     supabaseResponse.headers.set('x-subdomain', subdomain);
   }
 
-  // Handle subdomain routes
+  // Handle team subdomain separately for internal tool
+  if (subdomain === TEAM_SUBDOMAIN) {
+    console.log(`[Middleware] Team subdomain detected, Path: ${pathname}`);
+
+    // Allow API routes to handle their own auth
+    if (isApiRoute(pathname)) {
+      return supabaseResponse;
+    }
+
+    // Public routes (login, auth callback, etc.) should NOT be rewritten
+    if (isPublicRoute(pathname)) {
+      // If authenticated and on login page, redirect to team dashboard
+      if (user && pathname === '/login') {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+      return supabaseResponse;
+    }
+
+    // For protected routes: if not authenticated, redirect to login
+    if (!user) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      console.log(`[Middleware] Team: Not authenticated, redirecting to login`);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // User is authenticated - rewrite to /team/* routes
+    // The team layout will handle authorization (checking if user is team member)
+    if (!pathname.startsWith('/team')) {
+      const rewriteUrl = new URL(`/team${pathname}`, request.url);
+      console.log(`[Middleware] Team: Rewriting to: ${rewriteUrl.pathname}`);
+      return NextResponse.rewrite(rewriteUrl, {
+        headers: supabaseResponse.headers,
+      });
+    }
+
+    return supabaseResponse;
+  }
+
+  // Handle client subdomain routes
   if (subdomain) {
     // Allow API routes to handle their own auth
     if (isApiRoute(pathname)) {

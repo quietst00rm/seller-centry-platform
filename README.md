@@ -53,6 +53,10 @@ NEXT_PUBLIC_ROOT_DOMAIN=localhost:3000
 
 # Resend - Optional for local dev (ticket emails won't send without it)
 RESEND_API_KEY=re_xxxxx
+
+# Team Emails - Optional, comma-separated list of team member emails for internal tool
+# If not set, defaults to hardcoded list in lib/auth/team.ts
+TEAM_EMAILS=joe@sellercentry.com,kristen@sellercentry.com,info@sellercentry.com,joe@marketools.io
 ```
 
 #### Stringify the Google Service Account Key
@@ -173,8 +177,11 @@ seller-centry-platform/
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | Yes | Stringified Google Service Account JSON |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | Yes | `localhost:3000` for dev, `sellercentry.com` for prod |
 | `RESEND_API_KEY` | No* | Resend API key for sending emails |
+| `TEAM_EMAILS` | No** | Comma-separated list of team member emails for internal tool access |
 
 *Email functionality won't work without Resend API key, but app will still run.
+
+**If not set, defaults to: `joe@sellercentry.com,kristen@sellercentry.com,info@sellercentry.com,joe@marketools.io`
 
 ---
 

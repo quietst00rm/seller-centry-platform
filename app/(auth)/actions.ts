@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getSubdomainsByEmail } from '@/lib/google/sheets';
+import { isTeamMember } from '@/lib/auth/team';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 
@@ -12,10 +13,32 @@ const GENERIC_DOMAINS = [
   '127.0.0.1:3000',
 ];
 
+// Production domains
+const PRODUCTION_DOMAINS = [
+  'sellercentry.com',
+  'seller-centry-platform.vercel.app',
+];
+
 // Check if current host is a generic domain (no subdomain)
 function isGenericDomain(host: string): boolean {
   const hostname = host.toLowerCase();
   return GENERIC_DOMAINS.some(domain => hostname === domain || hostname.endsWith(`.${domain}`));
+}
+
+// Check if current host is on the team subdomain
+function isTeamSubdomain(host: string): boolean {
+  const hostname = host.toLowerCase();
+  // Check for team subdomain in production domains
+  for (const domain of PRODUCTION_DOMAINS) {
+    if (hostname === `team.${domain}`) {
+      return true;
+    }
+  }
+  // Check for team subdomain in local development
+  if (hostname === 'team.localhost' || hostname.startsWith('team.localhost:')) {
+    return true;
+  }
+  return false;
 }
 
 export async function signInWithEmail(formData: FormData) {
@@ -37,6 +60,22 @@ export async function signInWithEmail(formData: FormData) {
   // Check if we're on a generic domain and should redirect to user's subdomain
   const headersList = await headers();
   const host = headersList.get('host') || '';
+
+  // Check if user is logging in from the team subdomain
+  if (isTeamSubdomain(host)) {
+    // User is on team subdomain - middleware will handle rewrite to /team
+    // The team layout will check if they're authorized
+    redirect(redirectTo || '/');
+  }
+
+  // Check if user is a team member and should be redirected to team subdomain
+  if (isTeamMember(email)) {
+    // Team member on a generic domain - redirect to team subdomain
+    if (isGenericDomain(host)) {
+      const targetUrl = `https://team.sellercentry.com${redirectTo || '/'}`;
+      return { redirectUrl: targetUrl };
+    }
+  }
 
   if (isGenericDomain(host)) {
     try {
