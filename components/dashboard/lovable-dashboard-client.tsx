@@ -137,7 +137,11 @@ export function LovableDashboardClient({ subdomain, user, storeName, merchantId,
       />
 
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6">
-        <ViolationsTabManager subdomain={subdomain} onViewCase={handleViewCase} />
+        <ViolationsTabManager
+          subdomain={subdomain}
+          onViewCase={handleViewCase}
+          documentFolderUrl={documentFolderUrl}
+        />
       </main>
 
       {/* Case Detail Modal */}
