@@ -3,12 +3,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Users, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ClientTable } from './client-table';
 import { toast } from '@/hooks/use-toast';
 import type { ClientOverview, ClientsResponse } from '@/types';
 
 const AUTO_REFRESH_INTERVAL = 3 * 60 * 1000; // 3 minutes
+const STALE_DATA_WARNING = 5 * 60 * 1000; // 5 minutes
+const STALE_DATA_CRITICAL = 15 * 60 * 1000; // 15 minutes
+
+// Skeleton shimmer animation component
+function SkeletonShimmer({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`relative overflow-hidden bg-gray-800 rounded ${className}`}
+      style={{
+        backgroundImage: 'linear-gradient(90deg, #1f2937 0px, #374151 40px, #1f2937 80px)',
+        backgroundSize: '200px 100%',
+        animation: 'shimmer 1.5s infinite',
+      }}
+    />
+  );
+}
 
 export function TeamDashboard() {
   const [clients, setClients] = useState<ClientOverview[]>([]);
@@ -36,7 +51,7 @@ export function TeamDashboard() {
 
       if (showRefreshIndicator) {
         toast({
-          title: 'Data refreshed',
+          title: 'Client data refreshed',
           description: `${data.data?.total || 0} clients loaded`,
         });
       }
@@ -80,28 +95,79 @@ export function TeamDashboard() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Loading state
+  const getDataFreshness = (): { status: 'fresh' | 'stale' | 'critical'; message: string } => {
+    if (!lastRefreshed) return { status: 'critical', message: 'Never synced' };
+    const age = Date.now() - lastRefreshed.getTime();
+    if (age > STALE_DATA_CRITICAL) return { status: 'critical', message: 'Data may be stale' };
+    if (age > STALE_DATA_WARNING) return { status: 'stale', message: 'Data is 5+ min old' };
+    return { status: 'fresh', message: `Updated ${formatLastRefreshed(lastRefreshed)}` };
+  };
+
+  const freshness = getDataFreshness();
+
+  // Loading state with enhanced skeleton
   if (isLoading) {
     return (
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
+          {/* Add shimmer keyframes */}
+          <style jsx>{`
+            @keyframes shimmer {
+              0% { background-position: -200px 0; }
+              100% { background-position: calc(200px + 100%) 0; }
+            }
+          `}</style>
+
           {/* Header skeleton */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <Skeleton className="h-8 w-48 bg-gray-800" />
-              <Skeleton className="h-4 w-32 mt-2 bg-gray-800" />
+              <SkeletonShimmer className="h-8 w-48" />
+              <SkeletonShimmer className="h-4 w-32 mt-2" />
             </div>
-            <Skeleton className="h-10 w-24 bg-gray-800" />
+            <SkeletonShimmer className="h-10 w-24" />
           </div>
 
-          {/* Search skeleton */}
-          <Skeleton className="h-10 w-full mb-4 bg-gray-800" />
+          {/* KPI Cards skeleton */}
+          <div className="flex flex-wrap gap-4 mb-6">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-4 min-w-[160px]">
+                <SkeletonShimmer className="h-3 w-20 mb-2" />
+                <SkeletonShimmer className="h-8 w-16" />
+              </div>
+            ))}
+          </div>
+
+          {/* Search and filters skeleton */}
+          <div className="flex gap-4 mb-6">
+            <SkeletonShimmer className="h-10 w-80" />
+            <div className="flex gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonShimmer key={i} className="h-8 w-24" />
+              ))}
+            </div>
+          </div>
 
           {/* Table skeleton */}
           <div className="bg-[#1a1a1a] rounded-lg border border-gray-800 overflow-hidden">
+            {/* Header row */}
+            <div className="bg-[rgba(255,255,255,0.02)] border-b border-[rgba(255,255,255,0.08)] p-4">
+              <div className="flex gap-4">
+                <SkeletonShimmer className="h-4 w-32" />
+                <SkeletonShimmer className="h-4 w-12" />
+                <SkeletonShimmer className="h-4 w-12" />
+                <SkeletonShimmer className="h-4 w-16" />
+                <SkeletonShimmer className="h-4 w-12" />
+                <SkeletonShimmer className="h-4 w-12" />
+                <SkeletonShimmer className="h-4 w-20" />
+              </div>
+            </div>
+            {/* Data rows */}
             <div className="p-4 space-y-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full bg-gray-800" />
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <SkeletonShimmer className="h-4 w-4" />
+                  <SkeletonShimmer className="h-12 flex-1" />
+                </div>
               ))}
             </div>
           </div>
@@ -172,25 +238,43 @@ export function TeamDashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">Client Overview</h1>
-            <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
-              <span>{clients.length} clients</span>
-              <span className="text-gray-600">|</span>
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                Updated {formatLastRefreshed(lastRefreshed)}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Internal Tool /</span>
+              <h1 className="text-2xl font-semibold text-white">Client Overview</h1>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">{clients.length} clients</p>
+          </div>
+          <div className="flex items-center gap-4">
+            {/* Data freshness indicator */}
+            <div className="flex items-center gap-2 text-sm">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  freshness.status === 'fresh'
+                    ? 'bg-emerald-500'
+                    : freshness.status === 'stale'
+                      ? 'bg-amber-500'
+                      : 'bg-red-500'
+                }`}
+              />
+              <span className={`${
+                freshness.status === 'fresh'
+                  ? 'text-gray-400'
+                  : freshness.status === 'stale'
+                    ? 'text-amber-400'
+                    : 'text-red-400'
+              }`}>
+                {freshness.message}
               </span>
             </div>
+            <Button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </div>
-          <Button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            variant="outline"
-            className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
         </div>
 
         {/* Error banner (shown when refresh fails but we have cached data) */}
@@ -211,28 +295,26 @@ export function TeamDashboard() {
           </div>
         )}
 
+        {/* Stale data warning */}
+        {freshness.status === 'critical' && !error && (
+          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+            <p className="text-sm text-amber-400">
+              Data may be stale. Last updated over 15 minutes ago.
+            </p>
+            <Button
+              onClick={handleRefresh}
+              size="sm"
+              variant="ghost"
+              className="ml-auto text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+            >
+              Refresh Now
+            </Button>
+          </div>
+        )}
+
         {/* Client table */}
         <ClientTable clients={clients} />
-
-        {/* Legend */}
-        <div className="mt-6 flex flex-wrap gap-4 text-xs text-gray-500">
-          <div className="flex items-center gap-2">
-            <span className="text-orange-400 font-mono">48h</span>
-            <span>Violations in last 48 hours</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-yellow-400 font-mono">72h</span>
-            <span>Violations in last 72 hours</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-green-400 font-mono">Month</span>
-            <span>Resolved this month</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-red-400 font-mono">High</span>
-            <span>High impact violations</span>
-          </div>
-        </div>
       </div>
     </div>
   );
