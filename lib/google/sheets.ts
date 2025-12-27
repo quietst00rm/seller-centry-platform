@@ -148,13 +148,11 @@ export async function getViolations(
         });
         rows = response.data.values as string[][] | undefined;
         usedTabName = tabName;
-        console.log(`[getViolations] Found tab "${tabName}" for ${tab} violations`);
         break;
       } catch (tabError: unknown) {
         // Tab doesn't exist, try next variation
         const errorMessage = tabError instanceof Error ? tabError.message : String(tabError);
         if (errorMessage.includes('Unable to parse range') || errorMessage.includes('not found')) {
-          console.log(`[getViolations] Tab "${tabName}" not found, trying next...`);
           continue;
         }
         // If it's a different error (auth, network, etc.), throw it
@@ -163,22 +161,16 @@ export async function getViolations(
     }
 
     if (!usedTabName || !rows) {
-      console.error(`[getViolations] No valid tab found for ${tab} violations. Tried: ${tabNameVariations.join(', ')}`);
+      console.error(`[getViolations] No valid tab found for ${tab} violations`);
       return [];
     }
 
     if (rows.length < 2) {
-      console.log(`[getViolations] Tab "${usedTabName}" exists but has no data rows`);
       return [];
     }
 
     // Skip header row and map data
     const violations: Violation[] = [];
-
-    // Debug: Log header row to verify column structure
-    if (rows.length > 0) {
-      console.log(`[getViolations] Header row: ${rows[0].slice(0, 14).join(' | ')}`);
-    }
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -186,11 +178,6 @@ export async function getViolations(
       // Skip empty rows (rows without Violation ID AND without ASIN)
       if (!row || (!row[0] && !row[4])) {
         continue;
-      }
-
-      // Debug: Log raw status value from column L (index 11) for first few rows
-      if (i <= 5) {
-        console.log(`[getViolations] Row ${i} - Raw status (col L): "${row[11]}" → Parsed: "${tab === 'resolved' ? 'Resolved' : parseViolationStatus(row[11])}"`);
       }
 
       const violation: Violation = {
@@ -214,7 +201,6 @@ export async function getViolations(
       violations.push(violation);
     }
 
-    console.log(`[getViolations] Returning ${violations.length} ${tab} violations from "${usedTabName}"`);
     return violations;
   } catch (error) {
     console.error('Error fetching violations:', error);
@@ -256,12 +242,10 @@ export async function getViolationsForTeam(
         });
         rows = response.data.values as string[][] | undefined;
         usedTabName = tabName;
-        console.log(`[getViolationsForTeam] Found tab "${tabName}" for ${tab} violations`);
         break;
       } catch (tabError: unknown) {
         const errorMessage = tabError instanceof Error ? tabError.message : String(tabError);
         if (errorMessage.includes('Unable to parse range') || errorMessage.includes('not found')) {
-          console.log(`[getViolationsForTeam] Tab "${tabName}" not found, trying next...`);
           continue;
         }
         throw tabError;
@@ -269,12 +253,11 @@ export async function getViolationsForTeam(
     }
 
     if (!usedTabName || !rows) {
-      console.error(`[getViolationsForTeam] No valid tab found for ${tab} violations. Tried: ${tabNameVariations.join(', ')}`);
+      console.error(`[getViolationsForTeam] No valid tab found for ${tab} violations`);
       return [];
     }
 
     if (rows.length < 2) {
-      console.log(`[getViolationsForTeam] Tab "${usedTabName}" exists but has no data rows`);
       return [];
     }
 
@@ -309,7 +292,6 @@ export async function getViolationsForTeam(
       violations.push(violation);
     }
 
-    console.log(`[getViolationsForTeam] Returning ${violations.length} ${tab} violations from "${usedTabName}"`);
     return violations;
   } catch (error) {
     console.error('Error fetching team violations:', error);
@@ -429,14 +411,11 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
 
     const rows = response.data.values;
     if (!rows || rows.length < 2) {
-      console.log(`[getAccountsByEmail] No data rows found for email: ${email}`);
       return [];
     }
 
     const emailLower = email.toLowerCase();
     const isMasterUser = MASTER_USER_EMAILS.some(master => master.toLowerCase() === emailLower);
-
-    console.log(`[getAccountsByEmail] Searching for email: ${email} in ${rows.length - 1} rows (isMasterUser: ${isMasterUser})`);
 
     const accounts: { subdomain: string; storeName: string }[] = [];
     const seenSubdomains = new Set<string>();
@@ -486,7 +465,6 @@ export async function getAccountsByEmail(email: string): Promise<{ subdomain: st
       }
     }
 
-    console.log(`[getAccountsByEmail] Found ${accounts.length} accounts for ${email}`);
     return accounts;
   } catch (error) {
     console.error('Error fetching accounts by email:', error);
@@ -646,7 +624,6 @@ export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
       );
     }
 
-    console.log(`[getAllClientsWithMetrics] Returning ${clients.length} clients`);
     return clients;
   } catch (error) {
     console.error('Error fetching all clients:', error);
@@ -708,7 +685,6 @@ export async function getAllClientsBasic(): Promise<ClientOverview[]> {
       });
     }
 
-    console.log(`[getAllClientsBasic] Returning ${clients.length} clients`);
     return clients;
   } catch (error) {
     console.error('Error fetching basic clients:', error);
@@ -853,7 +829,6 @@ export async function updateViolation(
       }
 
       const range = `'${tabName}'!${column}${rowNumber}`;
-      console.log(`[updateViolation] Updating ${range} to "${value}"`);
 
       updatePromises.push(
         sheets.spreadsheets.values.update({
@@ -868,12 +843,10 @@ export async function updateViolation(
     }
 
     if (updatePromises.length === 0) {
-      console.log('[updateViolation] No updates to apply');
       return;
     }
 
     await Promise.all(updatePromises);
-    console.log(`[updateViolation] Successfully updated ${updatePromises.length} fields at row ${rowNumber}`);
   } catch (error) {
     console.error(`Error updating violation at row ${rowNumber}:`, error);
     handleSheetsError(error);
@@ -925,7 +898,6 @@ export async function appendRow(
       },
     });
 
-    console.log(`[appendRow] Successfully appended row to ${tabName}`);
   } catch (error) {
     console.error(`Error appending row to ${tabName}:`, error);
     handleSheetsError(error);
@@ -979,7 +951,6 @@ export async function deleteRow(
       },
     });
 
-    console.log(`[deleteRow] Successfully deleted row ${rowNumber} from ${tabName}`);
   } catch (error) {
     console.error(`Error deleting row ${rowNumber} from ${tabName}:`, error);
     handleSheetsError(error);
@@ -1021,8 +992,6 @@ export async function resolveViolation(
 
     // Delete from active tab
     await deleteRow(sheetId, activeTabName, rowNumber);
-
-    console.log(`[resolveViolation] Successfully moved violation to resolved tab`);
   } catch (error) {
     console.error('Error resolving violation:', error);
     if (error instanceof SheetsError) {
