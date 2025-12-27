@@ -11,6 +11,8 @@ import {
   CheckCircle,
   DollarSign,
   AlertCircle,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,6 +40,7 @@ export function ClientViolationsDashboard({
   const [activeTab, setActiveTab] = useState<ViolationTab>('active');
   const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const fetchViolations = useCallback(
     async (showRefreshIndicator = false) => {
@@ -109,6 +112,51 @@ export function ClientViolationsDashboard({
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedViolation(null);
+  };
+
+  // Handle PDF export
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const response = await fetch(`/api/team/export/documents-pdf?subdomain=${subdomain}`);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate PDF');
+      }
+
+      // Get the PDF blob
+      const blob = await response.blob();
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+      a.download = filenameMatch ? filenameMatch[1] : `SellerCentry_DocsNeeded_${subdomain}.pdf`;
+
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'PDF Generated',
+        description: 'Document request PDF has been downloaded.',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to export PDF';
+      toast({
+        title: 'Export Failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   // Calculate stats
@@ -243,17 +291,39 @@ export function ClientViolationsDashboard({
               </div>
             </div>
           </div>
-          <Button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            variant="outline"
-            className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
-          >
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`}
-            />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {stats.docsPending > 0 && (
+              <Button
+                onClick={handleExportPdf}
+                disabled={isExportingPdf}
+                variant="outline"
+                className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
+              >
+                {isExportingPdf ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Docs PDF
+                  </>
+                )}
+              </Button>
+            )}
+            <Button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              variant="outline"
+              className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`}
+              />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
         </div>
 
         {/* Stats Row */}
