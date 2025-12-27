@@ -132,6 +132,26 @@ export function ClientViolationsDashboard({
   const currentViolations =
     activeTab === 'active' ? activeViolations : resolvedViolations;
 
+  // Handle optimistic updates from table
+  const handleViolationUpdate = useCallback(
+    (violationId: string, updates: Partial<Violation>) => {
+      // If status changed to Resolved, refresh to move it between tabs
+      if (updates.status === 'Resolved') {
+        fetchViolations(false);
+        return;
+      }
+
+      // Optimistic update for other fields
+      setActiveViolations((prev) =>
+        prev.map((v) => (v.id === violationId ? { ...v, ...updates } : v))
+      );
+      setResolvedViolations((prev) =>
+        prev.map((v) => (v.id === violationId ? { ...v, ...updates } : v))
+      );
+    },
+    [fetchViolations]
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -311,6 +331,8 @@ export function ClientViolationsDashboard({
         <ViolationsTable
           violations={currentViolations}
           onRowClick={handleRowClick}
+          onViolationUpdate={handleViolationUpdate}
+          subdomain={subdomain}
           isActiveTab={activeTab === 'active'}
         />
 
