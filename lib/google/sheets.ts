@@ -257,9 +257,9 @@ export async function getViolations(
       ? ['All Current Violations', 'Current Violations', 'Active Violations', 'All Active Violations', 'Open Violations']
       : ['All Resolved Violations', 'Resolved Violations', 'Closed Violations', 'All Closed Violations'];
 
-    // For active tab, read A:O to include Docs Needed column (Column O)
-    // For resolved tab, read A:N as before
-    const rangeEnd = tab === 'active' ? 'O' : 'N';
+    // Read A:N for both tabs
+    // Column N is docsNeeded for active tab, dateResolved for resolved tab
+    const rangeEnd = 'N';
 
     let rows: string[][] | undefined;
     let usedTabName: string | null = null;
@@ -325,8 +325,9 @@ export async function getViolations(
         options: row[10] || '',
         status: tab === 'resolved' ? 'Resolved' : parseViolationStatus(row[11]),
         notes: row[12] || '',
+        // Column N is shared: docsNeeded for active, dateResolved for resolved
         dateResolved: tab === 'resolved' ? row[13] || '' : undefined,
-        docsNeeded: tab === 'active' ? row[14] || '' : undefined,
+        docsNeeded: tab === 'active' ? row[13] || '' : undefined,
       };
 
       violations.push(violation);
@@ -359,9 +360,9 @@ export async function getViolationsForTeam(
       ? ['All Current Violations', 'Current Violations', 'Active Violations', 'All Active Violations', 'Open Violations']
       : ['All Resolved Violations', 'Resolved Violations', 'Closed Violations', 'All Closed Violations'];
 
-    // For active tab, read A:O to include Docs Needed column
-    // For resolved tab, read A:N as before
-    const rangeEnd = tab === 'active' ? 'O' : 'N';
+    // Read A:N for both tabs
+    // Column N is docsNeeded for active tab, dateResolved for resolved tab
+    const rangeEnd = 'N';
 
     let rows: string[][] | undefined;
     let usedTabName: string | null = null;
@@ -423,8 +424,9 @@ export async function getViolationsForTeam(
         options: row[10] || '',
         status: tab === 'resolved' ? 'Resolved' : parseViolationStatus(row[11]),
         notes: row[12] || '',
+        // Column N is shared: docsNeeded for active, dateResolved for resolved
         dateResolved: tab === 'resolved' ? row[13] || '' : undefined,
-        docsNeeded: tab === 'active' ? row[14] || '' : undefined,
+        docsNeeded: tab === 'active' ? row[13] || '' : undefined,
       };
 
       violations.push(violation);
@@ -796,6 +798,7 @@ export async function getAllClientsBasic(): Promise<ClientOverview[]> {
 // ============================================
 
 // Column mapping for violation updates
+// Note: Column N is shared - used for docsNeeded in active tab, dateResolved in resolved tab
 const VIOLATION_COLUMN_MAP: Record<string, string> = {
   actionTaken: 'H',
   ahrImpact: 'I',
@@ -803,7 +806,7 @@ const VIOLATION_COLUMN_MAP: Record<string, string> = {
   options: 'K',
   status: 'L',
   notes: 'M',
-  docsNeeded: 'O',
+  docsNeeded: 'N', // Column N for active violations
 };
 
 // Type for violation updates
