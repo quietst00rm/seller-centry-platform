@@ -30,6 +30,7 @@ export interface Violation {
   status: ViolationStatus;     // Column L
   notes: string;               // Column M
   dateResolved?: string;       // Column N (only for resolved)
+  docsNeeded?: string;         // Column O (only for active, team view)
 }
 
 export type ViolationStatus =
