@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Users, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { ClientTable } from './client-table';
 import { toast } from '@/hooks/use-toast';
 import type { ClientOverview, ClientsResponse } from '@/types';
@@ -15,9 +14,9 @@ const STALE_DATA_CRITICAL = 15 * 60 * 1000; // 15 minutes
 function SkeletonShimmer({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`relative overflow-hidden bg-gray-800 rounded ${className}`}
+      className={`relative overflow-hidden bg-[#1f262e] rounded ${className}`}
       style={{
-        backgroundImage: 'linear-gradient(90deg, #1f2937 0px, #374151 40px, #1f2937 80px)',
+        backgroundImage: 'linear-gradient(90deg, #1f262e 0px, #2d333b 40px, #1f262e 80px)',
         backgroundSize: '200px 100%',
         animation: 'shimmer 1.5s infinite',
       }}
@@ -108,214 +107,198 @@ export function TeamDashboard() {
   // Loading state with enhanced skeleton
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Add shimmer keyframes */}
-          <style jsx>{`
-            @keyframes shimmer {
-              0% { background-position: -200px 0; }
-              100% { background-position: calc(200px + 100%) 0; }
-            }
-          `}</style>
+      <main className="flex-1 px-6 py-8 w-full max-w-[1920px] mx-auto">
+        {/* Add shimmer keyframes */}
+        <style jsx>{`
+          @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: calc(200px + 100%) 0; }
+          }
+        `}</style>
 
-          {/* Header skeleton */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <SkeletonShimmer className="h-8 w-48" />
-              <SkeletonShimmer className="h-4 w-32 mt-2" />
-            </div>
-            <SkeletonShimmer className="h-10 w-24" />
+        {/* Header skeleton */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+          <div>
+            <SkeletonShimmer className="h-8 w-48 mb-2" />
+            <SkeletonShimmer className="h-4 w-32" />
           </div>
+          <div className="flex items-center gap-4">
+            <SkeletonShimmer className="h-4 w-24" />
+            <SkeletonShimmer className="h-9 w-24" />
+          </div>
+        </div>
 
-          {/* KPI Cards skeleton */}
-          <div className="flex flex-wrap gap-4 mb-6">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-4 min-w-[160px]">
-                <SkeletonShimmer className="h-3 w-20 mb-2" />
-                <SkeletonShimmer className="h-8 w-16" />
+        {/* KPI Cards skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-[#161b22] border border-[#2d333b] rounded-lg p-4">
+              <SkeletonShimmer className="h-3 w-20 mb-3" />
+              <SkeletonShimmer className="h-8 w-16" />
+            </div>
+          ))}
+        </div>
+
+        {/* Search and filters skeleton */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <SkeletonShimmer className="h-10 w-80" />
+          <div className="flex gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonShimmer key={i} className="h-10 w-28 rounded-full" />
+            ))}
+          </div>
+        </div>
+
+        {/* Table skeleton */}
+        <div className="bg-[#161b22] rounded-lg border border-[#2d333b] overflow-hidden">
+          <div className="bg-[#1f262e] border-b border-[#2d333b] p-4">
+            <div className="flex gap-6">
+              <SkeletonShimmer className="h-4 w-32" />
+              <SkeletonShimmer className="h-4 w-12" />
+              <SkeletonShimmer className="h-4 w-12" />
+              <SkeletonShimmer className="h-4 w-16" />
+              <SkeletonShimmer className="h-4 w-12" />
+              <SkeletonShimmer className="h-4 w-12" />
+              <SkeletonShimmer className="h-4 w-20" />
+            </div>
+          </div>
+          <div className="divide-y divide-[#2d333b]">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="px-6 py-4">
+                <SkeletonShimmer className="h-6 w-full" />
               </div>
             ))}
           </div>
-
-          {/* Search and filters skeleton */}
-          <div className="flex gap-4 mb-6">
-            <SkeletonShimmer className="h-10 w-80" />
-            <div className="flex gap-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <SkeletonShimmer key={i} className="h-8 w-24" />
-              ))}
-            </div>
-          </div>
-
-          {/* Table skeleton */}
-          <div className="bg-[#1a1a1a] rounded-lg border border-gray-800 overflow-hidden">
-            {/* Header row */}
-            <div className="bg-[rgba(255,255,255,0.02)] border-b border-[rgba(255,255,255,0.08)] p-4">
-              <div className="flex gap-4">
-                <SkeletonShimmer className="h-4 w-32" />
-                <SkeletonShimmer className="h-4 w-12" />
-                <SkeletonShimmer className="h-4 w-12" />
-                <SkeletonShimmer className="h-4 w-16" />
-                <SkeletonShimmer className="h-4 w-12" />
-                <SkeletonShimmer className="h-4 w-12" />
-                <SkeletonShimmer className="h-4 w-20" />
-              </div>
-            </div>
-            {/* Data rows */}
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <SkeletonShimmer className="h-4 w-4" />
-                  <SkeletonShimmer className="h-12 flex-1" />
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   // Error state
   if (error && clients.length === 0) {
     return (
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-8">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
-                <AlertCircle className="h-8 w-8 text-red-500" />
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">Failed to Load Clients</h2>
-              <p className="text-gray-400 mb-6">{error}</p>
-              <Button
-                onClick={handleRefresh}
-                className="bg-orange-500 hover:bg-orange-600 text-white"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
+      <main className="flex-1 px-6 py-8 w-full max-w-[1920px] mx-auto">
+        <div className="bg-[#161b22] rounded-lg border border-[#2d333b] p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-red-500" />
             </div>
+            <h2 className="text-xl font-bold text-white mb-2">Failed to Load Clients</h2>
+            <p className="text-gray-400 mb-6">{error}</p>
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded font-medium transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   // Empty state
   if (clients.length === 0) {
     return (
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-[#1a1a1a] rounded-lg border border-gray-800 p-8">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-800 flex items-center justify-center">
-                <Users className="h-8 w-8 text-gray-500" />
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">No Clients Found</h2>
-              <p className="text-gray-400 mb-6">
-                There are no clients in the system yet.
-              </p>
-              <Button
-                onClick={handleRefresh}
-                variant="outline"
-                className="border-gray-700 text-gray-300 hover:bg-gray-800"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+      <main className="flex-1 px-6 py-8 w-full max-w-[1920px] mx-auto">
+        <div className="bg-[#161b22] rounded-lg border border-[#2d333b] p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#1f262e] flex items-center justify-center">
+              <Users className="h-8 w-8 text-gray-500" />
             </div>
+            <h2 className="text-xl font-bold text-white mb-2">No Clients Found</h2>
+            <p className="text-gray-400 mb-6">
+              There are no clients in the system yet.
+            </p>
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#1f262e] hover:bg-[#2d333b] text-gray-300 border border-[#2d333b] rounded font-medium transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   // Main content
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">Internal Tool /</span>
-              <h1 className="text-2xl font-semibold text-white">Client Overview</h1>
-            </div>
-            <p className="text-sm text-gray-500 mt-1">{clients.length} clients</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Data freshness indicator */}
-            <div className="flex items-center gap-2 text-sm">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  freshness.status === 'fresh'
-                    ? 'bg-emerald-500'
-                    : freshness.status === 'stale'
-                      ? 'bg-amber-500'
-                      : 'bg-red-500'
-                }`}
-              />
-              <span className={`${
-                freshness.status === 'fresh'
-                  ? 'text-gray-400'
-                  : freshness.status === 'stale'
-                    ? 'text-amber-400'
-                    : 'text-red-400'
-              }`}>
-                {freshness.message}
-              </span>
-            </div>
-            <Button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          </div>
+    <main className="flex-1 px-6 py-8 w-full max-w-[1920px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-white mb-1">Client Overview</h1>
+          <p className="text-sm text-gray-400">{clients.length} clients active</p>
         </div>
-
-        {/* Error banner (shown when refresh fails but we have cached data) */}
-        {error && clients.length > 0 && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-400">
-              Failed to refresh: {error}. Showing cached data.
-            </p>
-            <Button
-              onClick={handleRefresh}
-              size="sm"
-              variant="ghost"
-              className="ml-auto text-red-400 hover:text-red-300 hover:bg-red-500/10"
-            >
-              Retry
-            </Button>
+        <div className="flex items-center gap-4">
+          {/* Data freshness indicator */}
+          <div className="flex items-center gap-2 text-xs font-medium">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                freshness.status === 'fresh'
+                  ? 'bg-emerald-500 animate-pulse'
+                  : freshness.status === 'stale'
+                    ? 'bg-amber-500'
+                    : 'bg-red-500'
+              }`}
+            />
+            <span className={`${
+              freshness.status === 'fresh'
+                ? 'text-emerald-400'
+                : freshness.status === 'stale'
+                  ? 'text-amber-400'
+                  : 'text-red-400'
+            }`}>
+              {freshness.message}
+            </span>
           </div>
-        )}
-
-        {/* Stale data warning */}
-        {freshness.status === 'critical' && !error && (
-          <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
-            <p className="text-sm text-amber-400">
-              Data may be stale. Last updated over 15 minutes ago.
-            </p>
-            <Button
-              onClick={handleRefresh}
-              size="sm"
-              variant="ghost"
-              className="ml-auto text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-            >
-              Refresh Now
-            </Button>
-          </div>
-        )}
-
-        {/* Client table */}
-        <ClientTable clients={clients} />
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1f262e] hover:bg-[#2d333b] text-gray-300 rounded text-sm font-medium transition-colors border border-[#2d333b] disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
-    </div>
+
+      {/* Error banner (shown when refresh fails but we have cached data) */}
+      {error && clients.length > 0 && (
+        <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+          <p className="text-sm text-red-400">
+            Failed to refresh: {error}. Showing cached data.
+          </p>
+          <button
+            onClick={handleRefresh}
+            className="ml-auto text-sm text-red-400 hover:text-red-300 font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Stale data warning */}
+      {freshness.status === 'critical' && !error && (
+        <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-400">
+            Data may be stale. Last updated over 15 minutes ago.
+          </p>
+          <button
+            onClick={handleRefresh}
+            className="ml-auto text-sm text-amber-400 hover:text-amber-300 font-medium"
+          >
+            Refresh Now
+          </button>
+        </div>
+      )}
+
+      {/* Client table */}
+      <ClientTable clients={clients} />
+    </main>
   );
 }

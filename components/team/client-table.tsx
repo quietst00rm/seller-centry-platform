@@ -3,21 +3,16 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ExternalLink,
-  ChevronUp,
-  ChevronDown,
   Search,
-  AlertTriangle,
+  X,
   Users,
+  AlertTriangle,
   Clock,
   DollarSign,
   CheckCircle,
-  X,
-  Eye,
-  SearchX,
+  ExternalLink,
   type LucideIcon,
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import type { ClientOverview } from '@/types';
 
 type SortKey = keyof ClientOverview;
@@ -28,61 +23,61 @@ interface ClientTableProps {
   clients: ClientOverview[];
 }
 
-// KPI Card Component
+// KPI Card Component with left border accent
 function KpiCard({
   label,
   value,
   icon: Icon,
-  color = 'text-white',
-  glowColor,
+  accentColor,
+  textColor = 'text-white',
 }: {
   label: string;
   value: string | number;
   icon: LucideIcon;
-  color?: string;
-  glowColor?: string;
+  accentColor?: string;
+  textColor?: string;
 }) {
   return (
     <div
-      className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-4 min-w-[160px] relative"
-      style={glowColor ? { boxShadow: `0 0 20px ${glowColor}` } : undefined}
+      className={`bg-[#161b22] p-4 rounded-lg border border-[#2d333b] shadow-sm ${
+        accentColor ? `border-l-4 ${accentColor}` : ''
+      }`}
     >
-      <Icon className="absolute top-4 right-4 h-4 w-4 text-gray-500" />
-      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-2xl font-semibold ${color}`}>{value}</p>
+      <div className="flex justify-between items-start mb-2">
+        <span className={`text-xs font-semibold uppercase tracking-wider ${
+          textColor === 'text-white' ? 'text-gray-400' : textColor
+        }`}>
+          {label}
+        </span>
+        <Icon className={`h-5 w-5 ${textColor === 'text-white' ? 'text-gray-400' : textColor}`} />
+      </div>
+      <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
     </div>
   );
 }
 
-// Filter Button Component
+// Filter Button Component - Pill style
 function FilterButton({
   label,
   active,
-  count,
   onClick,
 }: {
   label: string;
   active: boolean;
-  count?: number;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
       className={`
-        px-3 py-1.5 text-[13px] rounded-md border transition-all duration-150
+        px-4 py-2 rounded-full text-sm font-medium transition-colors
         ${active
-          ? 'bg-orange-500/20 border-orange-500/50 text-orange-400'
-          : 'bg-transparent border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+          ? 'bg-orange-600 text-white shadow-sm hover:bg-orange-700'
+          : 'bg-[#161b22] text-gray-300 border border-[#2d333b] hover:bg-[#1f262e]'
         }
       `}
     >
       {label}
-      {count !== undefined && count > 0 && active && (
-        <span className="ml-2 bg-orange-500 text-white text-xs rounded-full min-w-[20px] px-1.5 py-0.5 inline-block text-center">
-          {count}
-        </span>
-      )}
     </button>
   );
 }
@@ -94,7 +89,6 @@ export function ClientTable({ clients }: ClientTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('highImpactCount');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [focusedRowIndex, setFocusedRowIndex] = useState<number>(-1);
 
   // Calculate KPI metrics
   const kpiMetrics = useMemo(() => {
@@ -154,46 +148,18 @@ export function ClientTable({ clients }: ClientTableProps) {
     return result;
   }, [clients, search, sortKey, sortDirection, activeFilter]);
 
-  // Get filter counts
-  const filterCounts = useMemo(() => ({
-    'high-impact': clients.filter(c => c.highImpactCount > 0).length,
-    'new-activity': clients.filter(c => c.violations48h > 0).length,
-    'high-revenue': clients.filter(c => c.atRiskSales > 100000).length,
-  }), [clients]);
-
-  // Keyboard shortcuts
+  // Keyboard shortcut for search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + K to focus search
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         searchInputRef.current?.focus();
-      }
-
-      // Arrow navigation when not in search
-      if (document.activeElement !== searchInputRef.current) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setFocusedRowIndex(prev => Math.min(prev + 1, filteredClients.length - 1));
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setFocusedRowIndex(prev => Math.max(prev - 1, 0));
-        } else if (e.key === 'Enter' && focusedRowIndex >= 0) {
-          const client = filteredClients[focusedRowIndex];
-          if (client) {
-            if (e.metaKey || e.ctrlKey) {
-              window.open(`https://${client.subdomain}.sellercentry.com`, '_blank');
-            } else {
-              router.push(`/team/client/${client.subdomain}`);
-            }
-          }
-        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [filteredClients, focusedRowIndex, router]);
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -208,7 +174,7 @@ export function ClientTable({ clients }: ClientTableProps) {
     router.push(`/team/client/${subdomain}`);
   };
 
-  const handleClientLinkClick = (e: React.MouseEvent, subdomain: string) => {
+  const handleExternalLinkClick = (e: React.MouseEvent, subdomain: string) => {
     e.stopPropagation();
     window.open(`https://${subdomain}.sellercentry.com`, '_blank', 'noopener,noreferrer');
   };
@@ -220,70 +186,7 @@ export function ClientTable({ clients }: ClientTableProps) {
     if (value >= 1000) {
       return `$${(value / 1000).toFixed(1)}K`;
     }
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatAtRiskRevenue = (value: number): string => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `$${(value / 1000).toFixed(1)}K`;
-    }
     return `$${value.toFixed(0)}`;
-  };
-
-  const getUrgencyClass = (highImpactCount: number): string => {
-    if (highImpactCount >= 5) return 'border-l-[3px] border-l-red-500';
-    if (highImpactCount >= 1) return 'border-l-[3px] border-l-amber-500';
-    return 'border-l-[3px] border-l-transparent';
-  };
-
-  const getWarningIconClass = (highImpactCount: number): string => {
-    if (highImpactCount >= 5) return 'text-red-500 animate-pulse';
-    if (highImpactCount >= 1) return 'text-amber-500';
-    return 'invisible';
-  };
-
-  const SortableHeader = ({
-    label,
-    sortKeyName,
-    className = '',
-    tooltip,
-  }: {
-    label: string;
-    sortKeyName: SortKey;
-    className?: string;
-    tooltip?: string;
-  }) => {
-    const isActive = sortKey === sortKeyName;
-    return (
-      <th
-        className={`px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.05em] cursor-pointer select-none transition-colors ${
-          isActive ? 'text-white' : 'text-[rgba(255,255,255,0.5)]'
-        } hover:text-white ${className}`}
-        onClick={() => handleSort(sortKeyName)}
-        title={tooltip}
-      >
-        <div className="flex items-center gap-1">
-          {label}
-          {isActive ? (
-            sortDirection === 'asc' ? (
-              <ChevronUp className="h-3.5 w-3.5 text-orange-400" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 text-orange-400" />
-            )
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-gray-600 opacity-0 group-hover:opacity-100" />
-          )}
-        </div>
-      </th>
-    );
   };
 
   const clearSearch = () => {
@@ -291,75 +194,96 @@ export function ClientTable({ clients }: ClientTableProps) {
     searchInputRef.current?.focus();
   };
 
-  const clearFilters = () => {
-    setActiveFilter('all');
-    setSearch('');
-  };
+  const SortableHeader = ({
+    label,
+    sortKeyName,
+    className = '',
+  }: {
+    label: string;
+    sortKeyName: SortKey;
+    className?: string;
+  }) => (
+    <th
+      className={`px-6 py-3 font-semibold tracking-wider cursor-pointer hover:text-gray-200 transition-colors ${className}`}
+      onClick={() => handleSort(sortKeyName)}
+    >
+      {label}
+    </th>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* KPI Summary Cards */}
-      <div className="flex flex-wrap gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard
           label="Total Clients"
           value={kpiMetrics.totalClients}
           icon={Users}
-          color="text-white"
+          textColor="text-white"
         />
         <KpiCard
           label="Needs Attention"
           value={kpiMetrics.needsAttention}
           icon={AlertTriangle}
-          color="text-amber-400"
-          glowColor={kpiMetrics.needsAttention > 0 ? 'rgba(251, 191, 36, 0.1)' : undefined}
+          accentColor="border-l-amber-500"
+          textColor="text-amber-500"
         />
         <KpiCard
-          label="New (48h)"
+          label="New (48H)"
           value={kpiMetrics.total48h}
           icon={Clock}
-          color="text-orange-400"
+          accentColor="border-l-orange-500"
+          textColor="text-orange-500"
         />
         <KpiCard
           label="At-Risk Revenue"
           value={formatCurrency(kpiMetrics.totalAtRisk)}
           icon={DollarSign}
-          color={kpiMetrics.totalAtRisk > 1000000 ? 'text-red-400' : kpiMetrics.totalAtRisk > 500000 ? 'text-orange-400' : 'text-gray-300'}
+          accentColor="border-l-red-500"
+          textColor="text-red-500"
         />
         <KpiCard
           label="Resolved (Month)"
           value={kpiMetrics.totalResolved}
           icon={CheckCircle}
-          color="text-emerald-400"
+          accentColor="border-l-teal-500"
+          textColor="text-teal-500"
         />
       </div>
 
       {/* Search and Filters Row */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+      <div className="flex flex-col md:flex-row gap-4">
         {/* Search */}
-        <div className="relative flex-1 max-w-[320px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-[18px] w-[18px] text-gray-500" />
-          <Input
+        <div className="relative w-full md:w-80 group">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-[18px] w-[18px] text-gray-400 group-focus-within:text-orange-500 transition-colors" />
+          </div>
+          <input
             ref={searchInputRef}
+            type="text"
             placeholder="Search clients..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-20 h-10 bg-[rgba(255,255,255,0.05)] border-[rgba(255,255,255,0.1)] text-white placeholder:text-gray-500 rounded-lg focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10"
+            className="block w-full pl-10 pr-12 py-2 bg-[#161b22] border border-[#2d333b] rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-shadow"
           />
-          {search && (
+          {search ? (
             <button
               onClick={clearSearch}
-              className="absolute right-12 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-white p-1"
+              className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
+          ) : (
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-mono text-gray-500 bg-[#1f262e] border border-[#2d333b] rounded">
+                {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘K' : 'Ctrl+K'}
+              </kbd>
+            </div>
           )}
-          <kbd className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded hidden sm:inline">
-            {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘K' : 'Ctrl+K'}
-          </kbd>
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex flex-wrap gap-2">
           <FilterButton
             label="All"
             active={activeFilter === 'all'}
@@ -368,168 +292,113 @@ export function ClientTable({ clients }: ClientTableProps) {
           <FilterButton
             label="High Impact"
             active={activeFilter === 'high-impact'}
-            count={filterCounts['high-impact']}
             onClick={() => setActiveFilter('high-impact')}
           />
           <FilterButton
             label="New Activity"
             active={activeFilter === 'new-activity'}
-            count={filterCounts['new-activity']}
             onClick={() => setActiveFilter('new-activity')}
           />
           <FilterButton
             label="High Revenue Risk"
             active={activeFilter === 'high-revenue'}
-            count={filterCounts['high-revenue']}
             onClick={() => setActiveFilter('high-revenue')}
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-[#1a1a1a] rounded-lg border border-gray-800 overflow-hidden">
+      <div className="bg-[#161b22] border border-[#2d333b] rounded-lg overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-[rgba(255,255,255,0.02)] border-b border-[rgba(255,255,255,0.08)] sticky top-0 z-10 backdrop-blur-sm">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-400 uppercase bg-[#1f262e] border-b border-[#2d333b] sticky top-0">
               <tr>
-                <th className="w-8 px-2 py-3"></th>
-                <SortableHeader label="Client Name" sortKeyName="storeName" />
-                <SortableHeader label="48h" sortKeyName="violations48h" className="text-center" tooltip="Violations imported in last 48 hours" />
-                <SortableHeader label="72h" sortKeyName="violations72h" className="text-center hidden md:table-cell" tooltip="Violations imported in last 72 hours" />
-                <SortableHeader label="Month" sortKeyName="resolvedThisMonth" className="text-center hidden md:table-cell" tooltip="Violations resolved this calendar month" />
-                <SortableHeader label="Total" sortKeyName="resolvedTotal" className="text-center" tooltip="Total active violations" />
-                <SortableHeader label="High" sortKeyName="highImpactCount" className="text-center" tooltip="High impact violations affecting account health" />
-                <SortableHeader label="At-Risk" sortKeyName="atRiskSales" className="text-right" tooltip="Total revenue at risk from active violations" />
-                <th className="w-20 px-2 py-3"></th>
+                <SortableHeader label="Client Name" sortKeyName="storeName" className="text-left" />
+                <SortableHeader label="48H" sortKeyName="violations48h" className="text-right" />
+                <SortableHeader label="72H" sortKeyName="violations72h" className="text-right hidden md:table-cell" />
+                <SortableHeader label="Month" sortKeyName="resolvedThisMonth" className="text-right hidden md:table-cell" />
+                <SortableHeader label="Total" sortKeyName="resolvedTotal" className="text-right" />
+                <SortableHeader label="High" sortKeyName="highImpactCount" className="text-right" />
+                <SortableHeader label="At-Risk" sortKeyName="atRiskSales" className="text-right" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
-              {filteredClients.map((client, index) => {
+            <tbody className="divide-y divide-[#2d333b]">
+              {filteredClients.map((client) => {
+                const isHighRisk = client.atRiskSales >= 1000000;
                 const hasHighImpact = client.highImpactCount > 0;
-                const isFocused = index === focusedRowIndex;
+
                 return (
                   <tr
                     key={client.subdomain}
                     onClick={() => handleRowClick(client.subdomain)}
                     className={`
-                      cursor-pointer transition-colors duration-150 group
-                      ${getUrgencyClass(client.highImpactCount)}
-                      ${isFocused ? 'ring-2 ring-orange-500/50 ring-inset bg-[rgba(255,255,255,0.04)]' : ''}
-                      ${hasHighImpact ? 'hover:bg-red-950/20' : 'hover:bg-[rgba(255,255,255,0.04)]'}
+                      cursor-pointer transition-colors group
+                      border-l-2 border-l-transparent hover:border-l-orange-500
+                      ${hasHighImpact && client.highImpactCount >= 5
+                        ? 'bg-amber-900/10 hover:bg-amber-900/20'
+                        : 'bg-[#161b22] hover:bg-[#1f262e]'
+                      }
                     `}
-                    onMouseEnter={() => setFocusedRowIndex(index)}
                   >
-                    {/* Warning Icon Column */}
-                    <td className="w-8 px-2 py-3 text-center">
-                      <AlertTriangle className={`h-4 w-4 ${getWarningIconClass(client.highImpactCount)}`} />
-                    </td>
-
                     {/* Client Name */}
-                    <td className="px-4 py-3">
+                    <td className="px-6 py-4 font-medium text-white whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span className="text-white font-medium group-hover:underline">
-                          {client.storeName}
-                        </span>
+                        {client.storeName}
                         <ExternalLink
-                          onClick={(e) => handleClientLinkClick(e, client.subdomain)}
-                          className="h-3.5 w-3.5 text-gray-500 opacity-0 group-hover:opacity-100 hover:text-orange-400 transition-all cursor-pointer"
+                          onClick={(e) => handleExternalLinkClick(e, client.subdomain)}
+                          className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-white transition-all cursor-pointer"
                         />
                       </div>
                     </td>
 
-                    {/* 48h */}
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`font-mono tabular-nums ${
-                          client.violations48h > 10
-                            ? 'bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded'
-                            : client.violations48h > 0
-                              ? 'text-orange-400'
-                              : 'text-gray-600'
-                        }`}
-                      >
-                        {client.violations48h === 0 ? '—' : client.violations48h}
-                      </span>
+                    {/* 48H */}
+                    <td className="px-6 py-4 text-right">
+                      {client.violations48h > 0 ? (
+                        <span className="text-orange-400 font-medium">{client.violations48h}</span>
+                      ) : (
+                        <span className="text-gray-600">—</span>
+                      )}
                     </td>
 
-                    {/* 72h */}
-                    <td className="px-4 py-3 text-center hidden md:table-cell">
-                      <span
-                        className={`font-mono tabular-nums ${
-                          client.violations72h > 0 ? 'text-orange-400' : 'text-gray-600'
-                        }`}
-                      >
-                        {client.violations72h === 0 ? '—' : client.violations72h}
-                      </span>
+                    {/* 72H */}
+                    <td className="px-6 py-4 text-right hidden md:table-cell">
+                      {client.violations72h > 0 ? (
+                        <span className="text-orange-400 font-medium">{client.violations72h}</span>
+                      ) : (
+                        <span className="text-gray-600">—</span>
+                      )}
                     </td>
 
                     {/* Month */}
-                    <td className="px-4 py-3 text-center hidden md:table-cell">
-                      <span
-                        className={`font-mono tabular-nums ${
-                          client.resolvedThisMonth > 0 ? 'text-teal-400' : 'text-gray-600'
-                        }`}
-                      >
-                        {client.resolvedThisMonth === 0 ? '—' : client.resolvedThisMonth}
-                      </span>
+                    <td className="px-6 py-4 text-right hidden md:table-cell">
+                      {client.resolvedThisMonth > 0 ? (
+                        <span className="text-teal-400 font-medium">{client.resolvedThisMonth}</span>
+                      ) : (
+                        <span className="text-gray-600">—</span>
+                      )}
                     </td>
 
                     {/* Total */}
-                    <td className="px-4 py-3 text-center">
-                      <span className="font-mono tabular-nums text-gray-300">
-                        {client.resolvedTotal}
-                      </span>
+                    <td className="px-6 py-4 text-right text-gray-300">
+                      {client.resolvedTotal}
                     </td>
 
                     {/* High */}
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`font-mono tabular-nums font-medium ${
-                          client.highImpactCount > 0
-                            ? 'bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded'
-                            : 'text-gray-600'
-                        }`}
-                      >
-                        {client.highImpactCount === 0 ? '—' : client.highImpactCount}
-                      </span>
+                    <td className="px-6 py-4 text-right">
+                      {client.highImpactCount > 0 ? (
+                        <span className="bg-amber-900/30 text-amber-400 py-0.5 px-2 rounded font-bold">
+                          {client.highImpactCount}
+                        </span>
+                      ) : (
+                        <span className="text-gray-600">—</span>
+                      )}
                     </td>
 
                     {/* At-Risk */}
-                    <td className="px-4 py-3 text-right">
-                      <span
-                        className={`font-mono tabular-nums ${
-                          client.atRiskSales > 1000000
-                            ? 'text-red-400'
-                            : client.atRiskSales > 0
-                              ? 'text-white'
-                              : 'text-gray-600'
-                        }`}
-                      >
-                        {client.atRiskSales === 0 ? '—' : formatAtRiskRevenue(client.atRiskSales)}
+                    <td className="px-6 py-4 text-right font-mono">
+                      <span className={isHighRisk ? 'text-red-400 font-bold' : 'text-gray-200'}>
+                        {formatCurrency(client.atRiskSales)}
                       </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="w-20 px-2 py-3">
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/team/client/${client.subdomain}`);
-                          }}
-                          className="h-7 px-2 bg-gray-700/80 hover:bg-gray-600 rounded text-gray-300 hover:text-white transition-colors"
-                          title="View violations"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => handleClientLinkClick(e, client.subdomain)}
-                          className="h-7 px-2 bg-transparent hover:bg-gray-700/50 rounded text-gray-400 hover:text-white transition-colors"
-                          title="Open client dashboard"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );
@@ -537,42 +406,45 @@ export function ClientTable({ clients }: ClientTableProps) {
             </tbody>
           </table>
         </div>
+
+        {/* Table Footer Legend */}
+        <div className="px-6 py-4 bg-[#1f262e] border-t border-[#2d333b] flex flex-wrap gap-6 text-xs text-gray-400">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+            <span>48h/72h - New violations</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-teal-400"></span>
+            <span>Month - Resolved this month</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span>High - High impact violations</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-red-400"></span>
+            <span>Critical urgency (5+ high impact)</span>
+          </div>
+        </div>
       </div>
 
-      {/* Empty state for filtered results */}
-      {filteredClients.length === 0 && (search || activeFilter !== 'all') && (
-        <div className="text-center py-12">
-          <SearchX className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+      {/* Empty state */}
+      {filteredClients.length === 0 && (
+        <div className="text-center py-12 bg-[#161b22] border border-[#2d333b] rounded-lg">
+          <Search className="h-12 w-12 text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No clients found</h3>
           <p className="text-gray-400 mb-4">Try adjusting your search or filters</p>
           <button
-            onClick={clearFilters}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-colors"
+            onClick={() => {
+              setActiveFilter('all');
+              setSearch('');
+            }}
+            className="px-4 py-2 bg-[#1f262e] hover:bg-[#2d333b] text-gray-300 hover:text-white rounded transition-colors"
           >
             Clear filters
           </button>
         </div>
       )}
-
-      {/* Legend */}
-      <div className="bg-[rgba(255,255,255,0.02)] rounded-md p-3 inline-flex flex-wrap gap-6">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-          <span className="text-xs text-gray-500">48h/72h - New violations</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-          <span className="text-xs text-gray-500">Month - Resolved this month</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-          <span className="text-xs text-gray-500">High - High impact violations</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-red-500"></span>
-          <span className="text-xs text-gray-500">Critical urgency (5+ high impact)</span>
-        </div>
-      </div>
     </div>
   );
 }
