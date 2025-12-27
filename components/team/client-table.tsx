@@ -21,42 +21,48 @@ type FilterType = 'all' | 'high-impact' | 'new-activity' | 'high-revenue';
 
 interface ClientTableProps {
   clients: ClientOverview[];
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
-// KPI Card Component with left border accent
+// KPI Card Component matching mockup design
 function KpiCard({
   label,
   value,
   icon: Icon,
-  accentColor,
-  textColor = 'text-white',
+  labelColor = 'text-gray-500 dark:text-gray-400',
+  iconBgColor = 'bg-gray-50 dark:bg-gray-800',
+  iconColor = 'text-gray-400',
+  borderColor = '',
 }: {
   label: string;
   value: string | number;
   icon: LucideIcon;
-  accentColor?: string;
-  textColor?: string;
+  labelColor?: string;
+  iconBgColor?: string;
+  iconColor?: string;
+  borderColor?: string;
 }) {
   return (
-    <div
-      className={`bg-[#161b22] p-4 rounded-lg border border-[#2d333b] shadow-sm ${
-        accentColor ? `border-l-4 ${accentColor}` : ''
-      }`}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <span className={`text-xs font-semibold uppercase tracking-wider ${
-          textColor === 'text-white' ? 'text-gray-400' : textColor
-        }`}>
-          {label}
-        </span>
-        <Icon className={`h-5 w-5 ${textColor === 'text-white' ? 'text-gray-400' : textColor}`} />
+    <div className={`bg-white dark:bg-[#161b22] p-6 rounded-xl border border-gray-200 dark:border-[#30363d] shadow-sm hover:shadow-md transition-shadow ${borderColor}`}>
+      <div className="flex justify-between items-start">
+        <div>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-3 ${labelColor}`}>
+            {label}
+          </p>
+          <p className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+            {value}
+          </p>
+        </div>
+        <div className={`w-10 h-10 rounded-full ${iconBgColor} flex items-center justify-center border border-gray-100 dark:border-gray-700`}>
+          <Icon className={`h-5 w-5 ${iconColor}`} />
+        </div>
       </div>
-      <div className={`text-2xl font-bold ${textColor}`}>{value}</div>
     </div>
   );
 }
 
-// Filter Button Component - Pill style
+// Filter Button Component - Pill style matching mockup
 function FilterButton({
   label,
   active,
@@ -70,10 +76,10 @@ function FilterButton({
     <button
       onClick={onClick}
       className={`
-        px-4 py-2 rounded-full text-sm font-medium transition-colors
+        px-5 py-2 rounded-full text-sm font-medium transition-all shadow-sm
         ${active
-          ? 'bg-orange-600 text-white shadow-sm hover:bg-orange-700'
-          : 'bg-[#161b22] text-gray-300 border border-[#2d333b] hover:bg-[#1f262e]'
+          ? 'bg-gradient-to-b from-gray-800 to-gray-950 dark:from-gray-100 dark:to-gray-300 text-white dark:text-gray-900 border border-transparent'
+          : 'bg-white dark:bg-[#161b22] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-[#1f262e] hover:text-gray-900 dark:hover:text-white'
         }
       `}
     >
@@ -82,7 +88,7 @@ function FilterButton({
   );
 }
 
-export function ClientTable({ clients }: ClientTableProps) {
+export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTableProps) {
   const router = useRouter();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
@@ -96,9 +102,9 @@ export function ClientTable({ clients }: ClientTableProps) {
     const needsAttention = clients.filter(c => c.highImpactCount > 0).length;
     const total48h = clients.reduce((sum, c) => sum + (c.violations48h || 0), 0);
     const totalAtRisk = clients.reduce((sum, c) => sum + (c.atRiskSales || 0), 0);
-    const totalResolved = clients.reduce((sum, c) => sum + (c.resolvedThisMonth || 0), 0);
+    const totalResolvedMonth = clients.reduce((sum, c) => sum + (c.resolvedThisMonth || 0), 0);
 
-    return { totalClients, needsAttention, total48h, totalAtRisk, totalResolved };
+    return { totalClients, needsAttention, total48h, totalAtRisk, totalResolvedMonth };
   }, [clients]);
 
   // Filter and sort clients
@@ -111,7 +117,7 @@ export function ClientTable({ clients }: ClientTableProps) {
         result = result.filter(c => c.highImpactCount > 0);
         break;
       case 'new-activity':
-        result = result.filter(c => c.violations48h > 0);
+        result = result.filter(c => c.violations48h > 0 || c.violationsThisWeek > 0);
         break;
       case 'high-revenue':
         result = result.filter(c => c.atRiskSales > 100000);
@@ -204,7 +210,8 @@ export function ClientTable({ clients }: ClientTableProps) {
     className?: string;
   }) => (
     <th
-      className={`px-6 py-3 font-semibold tracking-wider cursor-pointer hover:text-gray-200 transition-colors ${className}`}
+      scope="col"
+      className={`px-6 py-5 font-bold tracking-wider cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors text-center ${className}`}
       onClick={() => handleSort(sortKeyName)}
     >
       {label}
@@ -212,80 +219,57 @@ export function ClientTable({ clients }: ClientTableProps) {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <KpiCard
           label="Total Clients"
           value={kpiMetrics.totalClients}
           icon={Users}
-          textColor="text-white"
+          iconBgColor="bg-gray-50 dark:bg-gray-800"
+          iconColor="text-gray-400"
         />
         <KpiCard
           label="Needs Attention"
           value={kpiMetrics.needsAttention}
           icon={AlertTriangle}
-          accentColor="border-l-amber-500"
-          textColor="text-amber-500"
+          labelColor="text-amber-600 dark:text-amber-500"
+          iconBgColor="bg-amber-50 dark:bg-amber-900/20"
+          iconColor="text-amber-500"
+          borderColor="border-amber-100 dark:border-amber-900/30"
         />
         <KpiCard
           label="New (48H)"
           value={kpiMetrics.total48h}
           icon={Clock}
-          accentColor="border-l-orange-500"
-          textColor="text-orange-500"
+          labelColor="text-orange-600 dark:text-orange-500"
+          iconBgColor="bg-orange-50 dark:bg-orange-900/20"
+          iconColor="text-orange-500"
         />
         <KpiCard
           label="At-Risk Revenue"
           value={formatCurrency(kpiMetrics.totalAtRisk)}
           icon={DollarSign}
-          accentColor="border-l-red-500"
-          textColor="text-red-500"
+          labelColor="text-red-600 dark:text-red-500"
+          iconBgColor="bg-red-50 dark:bg-red-900/20"
+          iconColor="text-red-500"
         />
         <KpiCard
           label="Resolved (Month)"
-          value={kpiMetrics.totalResolved}
+          value={kpiMetrics.totalResolvedMonth}
           icon={CheckCircle}
-          accentColor="border-l-teal-500"
-          textColor="text-teal-500"
+          labelColor="text-teal-600 dark:text-teal-500"
+          iconBgColor="bg-teal-50 dark:bg-teal-900/20"
+          iconColor="text-teal-500"
         />
       </div>
 
-      {/* Search and Filters Row */}
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* Search */}
-        <div className="relative w-full md:w-80 group">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-[18px] w-[18px] text-gray-400 group-focus-within:text-orange-500 transition-colors" />
-          </div>
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search clients..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="block w-full pl-10 pr-12 py-2 bg-[#161b22] border border-[#2d333b] rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-shadow"
-          />
-          {search ? (
-            <button
-              onClick={clearSearch}
-              className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-mono text-gray-500 bg-[#1f262e] border border-[#2d333b] rounded">
-                {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac') ? '⌘K' : 'Ctrl+K'}
-              </kbd>
-            </div>
-          )}
-        </div>
-
+      {/* Filters and Search Row */}
+      <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
         {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-3">
           <FilterButton
-            label="All"
+            label="All Clients"
             active={activeFilter === 'all'}
             onClick={() => setActiveFilter('all')}
           />
@@ -300,32 +284,63 @@ export function ClientTable({ clients }: ClientTableProps) {
             onClick={() => setActiveFilter('new-activity')}
           />
           <FilterButton
-            label="High Revenue Risk"
+            label="Revenue Risk"
             active={activeFilter === 'high-revenue'}
             onClick={() => setActiveFilter('high-revenue')}
           />
         </div>
+
+        {/* Search */}
+        <div className="relative w-full md:w-80 group">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-[18px] w-[18px] text-gray-400 group-focus-within:text-gray-600 dark:group-focus-within:text-gray-300 transition-colors" />
+          </div>
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search clients by name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="block w-full pl-10 pr-12 py-2.5 bg-white dark:bg-[#161b22] border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all shadow-sm"
+          />
+          {search ? (
+            <button
+              onClick={clearSearch}
+              className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-mono text-gray-400 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                ⌘K
+              </kbd>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-[#161b22] border border-[#2d333b] rounded-lg overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-400 uppercase bg-[#1f262e] border-b border-[#2d333b] sticky top-0">
+          <table className="w-full text-sm text-left border-collapse">
+            <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50/80 dark:bg-[#1a2027] border-b border-gray-200 dark:border-[#30363d] sticky top-0 backdrop-blur-sm z-10">
               <tr>
                 <SortableHeader label="Client Name" sortKeyName="storeName" className="text-left" />
-                <SortableHeader label="48H" sortKeyName="violations48h" className="text-right" />
-                <SortableHeader label="72H" sortKeyName="violations72h" className="text-right hidden md:table-cell" />
-                <SortableHeader label="Month" sortKeyName="resolvedThisMonth" className="text-right hidden md:table-cell" />
-                <SortableHeader label="Total" sortKeyName="resolvedTotal" className="text-right" />
-                <SortableHeader label="High" sortKeyName="highImpactCount" className="text-right" />
-                <SortableHeader label="At-Risk" sortKeyName="atRiskSales" className="text-right" />
+                <SortableHeader label="New (48h)" sortKeyName="violations48h" />
+                <SortableHeader label="This Week" sortKeyName="violationsThisWeek" />
+                <SortableHeader label="Resolved (Month)" sortKeyName="resolvedThisMonth" />
+                <SortableHeader label="Resolved (Week)" sortKeyName="resolvedThisWeek" />
+                <SortableHeader label="Active Violations" sortKeyName="activeViolations" />
+                <SortableHeader label="High Impact" sortKeyName="highImpactCount" />
+                <SortableHeader label="Revenue At-Risk" sortKeyName="atRiskSales" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#2d333b]">
+            <tbody className="divide-y divide-gray-100 dark:divide-[#30363d]">
               {filteredClients.map((client) => {
                 const isHighRisk = client.atRiskSales >= 1000000;
-                const hasHighImpact = client.highImpactCount > 0;
+                const hasHighImpact = client.highImpactCount >= 3;
+                const hasNewActivity = client.violations48h > 0 || client.violationsThisWeek > 0;
 
                 return (
                   <tr
@@ -333,72 +348,87 @@ export function ClientTable({ clients }: ClientTableProps) {
                     onClick={() => handleRowClick(client.subdomain)}
                     className={`
                       cursor-pointer transition-colors group
-                      border-l-2 border-l-transparent hover:border-l-orange-500
-                      ${hasHighImpact && client.highImpactCount >= 5
-                        ? 'bg-amber-900/10 hover:bg-amber-900/20'
-                        : 'bg-[#161b22] hover:bg-[#1f262e]'
+                      border-l-[3px] hover:border-l-orange-500
+                      ${hasNewActivity || hasHighImpact
+                        ? 'bg-orange-50/50 dark:bg-orange-900/10 hover:bg-orange-100/50 dark:hover:bg-orange-900/20 border-l-orange-500'
+                        : 'bg-white dark:bg-[#161b22] hover:bg-gray-50 dark:hover:bg-[#1f262e] border-l-transparent hover:border-l-orange-500/30'
                       }
                     `}
                   >
                     {/* Client Name */}
-                    <td className="px-6 py-4 font-medium text-white whitespace-nowrap">
+                    <td className="px-6 py-5 font-medium text-gray-900 dark:text-white whitespace-nowrap text-left">
                       <div className="flex items-center gap-2">
                         {client.storeName}
                         <ExternalLink
                           onClick={(e) => handleExternalLinkClick(e, client.subdomain)}
-                          className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-white transition-all cursor-pointer"
+                          className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-gray-600 dark:hover:text-white transition-all cursor-pointer"
                         />
                       </div>
                     </td>
 
-                    {/* 48H */}
-                    <td className="px-6 py-4 text-right">
+                    {/* New (48h) */}
+                    <td className="px-6 py-5 text-center">
                       {client.violations48h > 0 ? (
-                        <span className="text-orange-400 font-medium">{client.violations48h}</span>
+                        <span className="text-orange-600 dark:text-orange-400 font-semibold">{client.violations48h}</span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-300 dark:text-gray-600">0</span>
                       )}
                     </td>
 
-                    {/* 72H */}
-                    <td className="px-6 py-4 text-right hidden md:table-cell">
-                      {client.violations72h > 0 ? (
-                        <span className="text-orange-400 font-medium">{client.violations72h}</span>
+                    {/* This Week */}
+                    <td className="px-6 py-5 text-center">
+                      {client.violationsThisWeek > 0 ? (
+                        <span className="text-orange-600 dark:text-orange-400 font-semibold">{client.violationsThisWeek}</span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-300 dark:text-gray-600">0</span>
                       )}
                     </td>
 
-                    {/* Month */}
-                    <td className="px-6 py-4 text-right hidden md:table-cell">
+                    {/* Resolved (Month) */}
+                    <td className="px-6 py-5 text-center">
                       {client.resolvedThisMonth > 0 ? (
-                        <span className="text-teal-400 font-medium">{client.resolvedThisMonth}</span>
+                        <span className="text-teal-600 dark:text-teal-400 font-semibold">{client.resolvedThisMonth}</span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-300 dark:text-gray-600">0</span>
                       )}
                     </td>
 
-                    {/* Total */}
-                    <td className="px-6 py-4 text-right text-gray-300">
-                      {client.resolvedTotal}
+                    {/* Resolved (Week) */}
+                    <td className="px-6 py-5 text-center">
+                      {client.resolvedThisWeek > 0 ? (
+                        <span className="text-teal-600 dark:text-teal-400 font-semibold">{client.resolvedThisWeek}</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">0</span>
+                      )}
                     </td>
 
-                    {/* High */}
-                    <td className="px-6 py-4 text-right">
+                    {/* Active Violations */}
+                    <td className="px-6 py-5 text-center text-gray-900 dark:text-gray-300">
+                      {client.activeViolations}
+                    </td>
+
+                    {/* High Impact */}
+                    <td className="px-6 py-5 text-center">
                       {client.highImpactCount > 0 ? (
-                        <span className="bg-amber-900/30 text-amber-400 py-0.5 px-2 rounded font-bold">
+                        <span className="text-amber-700 dark:text-amber-500 font-bold">
                           {client.highImpactCount}
                         </span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-300 dark:text-gray-600">0</span>
                       )}
                     </td>
 
-                    {/* At-Risk */}
-                    <td className="px-6 py-4 text-right font-mono">
-                      <span className={isHighRisk ? 'text-red-400 font-bold' : 'text-gray-200'}>
-                        {formatCurrency(client.atRiskSales)}
-                      </span>
+                    {/* Revenue At-Risk */}
+                    <td className="px-6 py-5 text-center">
+                      {isHighRisk ? (
+                        <span className="inline-block bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-200 font-bold font-mono px-2.5 py-1 rounded border border-red-100 dark:border-red-800/50 shadow-sm">
+                          {formatCurrency(client.atRiskSales)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-900 dark:text-gray-200 font-mono tracking-tight">
+                          {formatCurrency(client.atRiskSales)}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -406,40 +436,20 @@ export function ClientTable({ clients }: ClientTableProps) {
             </tbody>
           </table>
         </div>
-
-        {/* Table Footer Legend */}
-        <div className="px-6 py-4 bg-[#1f262e] border-t border-[#2d333b] flex flex-wrap gap-6 text-xs text-gray-400">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-            <span>48h/72h - New violations</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-teal-400"></span>
-            <span>Month - Resolved this month</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span>High - High impact violations</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-400"></span>
-            <span>Critical urgency (5+ high impact)</span>
-          </div>
-        </div>
       </div>
 
       {/* Empty state */}
       {filteredClients.length === 0 && (
-        <div className="text-center py-12 bg-[#161b22] border border-[#2d333b] rounded-lg">
-          <Search className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">No clients found</h3>
-          <p className="text-gray-400 mb-4">Try adjusting your search or filters</p>
+        <div className="text-center py-12 bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl">
+          <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No clients found</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">Try adjusting your search or filters</p>
           <button
             onClick={() => {
               setActiveFilter('all');
               setSearch('');
             }}
-            className="px-4 py-2 bg-[#1f262e] hover:bg-[#2d333b] text-gray-300 hover:text-white rounded transition-colors"
+            className="px-4 py-2 bg-gray-100 dark:bg-[#1f262e] hover:bg-gray-200 dark:hover:bg-[#2d333b] text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors"
           >
             Clear filters
           </button>

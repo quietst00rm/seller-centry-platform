@@ -84,9 +84,10 @@ export interface ClientOverview {
   email: string;
   sheetUrl: string;
   violations48h: number;
-  violations72h: number;
+  violationsThisWeek: number;  // Last 7 days
   resolvedThisMonth: number;
-  resolvedTotal: number;
+  resolvedThisWeek: number;    // Last 7 days
+  activeViolations: number;    // Total active count
   highImpactCount: number;
   atRiskSales: number;
 }
