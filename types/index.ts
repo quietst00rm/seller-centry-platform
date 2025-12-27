@@ -75,3 +75,26 @@ export interface ViolationsResponse {
   };
   error?: string;
 }
+
+// Client overview data for internal team tool
+export interface ClientOverview {
+  storeName: string;
+  subdomain: string;
+  email: string;
+  sheetUrl: string;
+  violations48h: number;
+  violations72h: number;
+  resolvedThisMonth: number;
+  resolvedTotal: number;
+  highImpactCount: number;
+  atRiskSales: number;
+}
+
+export interface ClientsResponse {
+  success: boolean;
+  data?: {
+    clients: ClientOverview[];
+    total: number;
+  };
+  error?: string;
+}
