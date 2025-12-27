@@ -5,7 +5,7 @@
 // Default team emails if TEAM_EMAILS environment variable is not set
 const DEFAULT_TEAM_EMAILS = [
   'joe@sellercentry.com',
-  'kristen@sellercentry.com',
+  'kristen@marketools.io',
   'info@sellercentry.com',
   'joe@marketools.io',
 ];
