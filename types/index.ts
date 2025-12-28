@@ -88,7 +88,8 @@ export interface ClientOverview {
   resolvedThisMonth: number;
   resolvedThisWeek: number;    // Last 7 days
   activeViolations: number;    // Total active count
-  needsDocsCount: number;      // Violations with docsNeeded != "None"
+  needsInvoiceCount: number;   // Violations with docsNeeded == "Invoice"
+  needsDocsCount: number;      // Violations with docsNeeded != "None" and != "Invoice"
   highImpactCount: number;
   atRiskSales: number;
 }
