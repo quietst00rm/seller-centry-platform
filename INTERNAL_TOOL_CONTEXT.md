@@ -1,20 +1,22 @@
 # Seller Centry Platform - Internal Team Tool Context
 
-> **Purpose**: This document provides complete context for building an internal team tool subdomain app that will allow the Seller Centry team to manage client violations directly, instead of working from Google Sheets.
+> **Purpose**: This document provides complete context for the internal team tool subdomain app that allows the Seller Centry team to manage client violations directly from a web interface.
+
+> **Status**: ✅ **FULLY IMPLEMENTED** - The internal team tool is live at `team.sellercentry.com`
 
 ---
 
 ## Table of Contents
 1. [Project Overview](#project-overview)
-2. [Current Architecture](#current-architecture)
-3. [Google Sheets Data Structure](#google-sheets-data-structure)
-4. [Google Sheets API Integration](#google-sheets-api-integration)
+2. [Internal Tool Architecture](#internal-tool-architecture)
+3. [Team Dashboard Features](#team-dashboard-features)
+4. [Google Sheets Data Structure](#google-sheets-data-structure)
 5. [API Endpoints Reference](#api-endpoints-reference)
-6. [Authentication System](#authentication-system)
-7. [Subdomain Routing System](#subdomain-routing-system)
-8. [Data Types & Interfaces](#data-types--interfaces)
-9. [Current Capabilities vs. Needed Capabilities](#current-capabilities-vs-needed-capabilities)
-10. [Internal Tool Requirements](#internal-tool-requirements)
+6. [Authentication & Authorization](#authentication--authorization)
+7. [Data Types & Interfaces](#data-types--interfaces)
+8. [Violation Metrics Calculation](#violation-metrics-calculation)
+9. [Rate Limiting & Caching](#rate-limiting--caching)
+10. [UI Components](#ui-components)
 
 ---
 
@@ -22,81 +24,122 @@
 
 **Seller Centry Platform** is a multi-tenant Amazon Seller Account Health Dashboard. Each client accesses their violations data via their own subdomain (e.g., `alwayz-on-sale.sellercentry.com`).
 
+The **Internal Team Tool** at `team.sellercentry.com` allows team members to:
+- View ALL client violations across all accounts in a single dashboard
+- **EDIT** violation data (status, notes, action taken, next steps, documents needed)
+- **UPDATE** Google Sheets directly from the UI
+- Track client metrics (48h, weekly, monthly counts)
+- Manage workflows without opening Google Sheets
+
 ### Tech Stack
 | Category | Technology | Version |
 |----------|-----------|---------|
 | Framework | Next.js | 15.3.6 |
 | Language | TypeScript | 5.8.3 |
 | Auth | Supabase | 2.47.10 |
-| Data Store | Google Sheets API | v4 |
+| Data Store | Google Sheets API | v4 (read/write) |
 | Styling | Tailwind CSS | 4.x |
 | UI Library | shadcn/ui | (Radix-based) |
 | Email | Resend | 4.0.1 |
 | Deployment | Vercel | Wildcard subdomains |
 
-### Current System Flow
+---
+
+## Internal Tool Architecture
+
+### Directory Structure (Team Tool Specific)
 ```
-Client visits subdomain → Middleware extracts subdomain → Auth check →
-Fetch data from Google Sheets (READ-ONLY) → Display in dashboard
+app/
+├── team/                          # Internal team tool
+│   ├── layout.tsx                 # Team layout with auth check
+│   ├── page.tsx                   # Team dashboard (client overview)
+│   └── client/[subdomain]/        # Per-client violation view
+│       └── page.tsx
+├── api/
+│   ├── team/
+│   │   ├── clients/route.ts       # GET all clients with metrics
+│   │   └── violations/
+│   │       ├── route.ts           # GET violations for team view
+│   │       ├── update/route.ts    # PATCH single violation
+│   │       ├── bulk-update/route.ts # PATCH multiple violations
+│   │       └── resolve/route.ts   # POST move to resolved
+│   └── export/
+│       └── documents-pdf/route.ts # PDF export for documents needed
+
+components/
+├── team/                          # Team-specific components
+│   ├── client-table.tsx           # Main client overview table with KPIs
+│   ├── team-dashboard.tsx         # Dashboard wrapper with data fetching
+│   ├── violations-table.tsx       # Per-client violations table
+│   ├── violation-detail-modal.tsx # Edit modal for violations
+│   └── client-violations-dashboard.tsx # Client detail page
+
+lib/
+├── auth/
+│   └── team.ts                    # Team authorization utilities
+└── google/
+    └── sheets.ts                  # Google Sheets API (read + write)
 ```
 
-### Internal Tool Goal
-Create a new subdomain (e.g., `team.sellercentry.com` or `admin.sellercentry.com`) where Seller Centry team members can:
-- View ALL client violations across all accounts
-- **EDIT** violation data (status, notes, action taken, next steps, etc.)
-- **UPDATE** Google Sheets directly from the UI
-- Manage workflows without opening Google Sheets
+### Access Flow
+```
+team.sellercentry.com → Middleware checks auth →
+Verify team member email → Show team dashboard →
+Click client → Per-client violation view → Edit violations
+```
 
 ---
 
-## Current Architecture
+## Team Dashboard Features
 
-### Directory Structure
-```
-app/
-├── (auth)/                    # Auth routes (login, forgot-password)
-│   ├── login/page.tsx         # Login page
-│   ├── forgot-password/page.tsx
-│   └── actions.ts             # Server actions (signIn, signOut, etc.)
-├── api/
-│   ├── tenant/route.ts        # GET tenant metadata
-│   ├── violations/route.ts    # GET violations with filters
-│   ├── ticket/route.ts        # POST support tickets (email)
-│   └── user-subdomain/route.ts # GET user's assigned subdomains
-├── auth/callback/route.ts     # OAuth callback handler
-├── s/[subdomain]/page.tsx     # Dynamic subdomain dashboard
-├── layout.tsx                 # Root layout
-└── page.tsx                   # Landing page (root domain)
+### Client Overview Dashboard (`/team`)
 
-components/
-├── dashboard/                 # Dashboard components
-│   ├── lovable-dashboard-client.tsx  # Main dashboard client
-│   ├── app-header.tsx         # Header with account switcher
-│   ├── violations-tab-manager.tsx
-│   ├── violations-main.tsx
-│   ├── issue-table.tsx        # Table/card display
-│   ├── case-detail-modal.tsx  # Single violation detail view
-│   └── submit-ticket-modal.tsx
-└── ui/                        # shadcn/ui components
+**KPI Summary Cards** (5 cards):
+1. **Total Clients** - Count of all monitored clients
+2. **Needs Attention** - Clients with high-impact violations
+3. **New (48H)** - Total violations across all clients in last 48 hours
+4. **At-Risk Revenue** - Sum of all at-risk sales (abbreviated: $17.2M)
+5. **Resolved (Month)** - Total resolved this month
 
-lib/
-├── google/sheets.ts           # Google Sheets API (READ-ONLY currently)
-├── supabase/
-│   ├── client.ts              # Browser Supabase client
-│   ├── server.ts              # Server Supabase client
-│   └── middleware.ts          # Session management
-└── utils.ts                   # Utility functions (cn, etc.)
+**Filter Buttons** (pill-style):
+- All Clients
+- High Impact (clients with highImpactCount > 0)
+- New Activity (clients with violations in 48h or 7 days)
+- Revenue Risk (clients with atRiskSales > $100K)
 
-hooks/
-├── use-violations-data.ts     # Violations data fetching
-├── use-dashboard-data.ts      # Combined dashboard data hook
-└── use-user-accounts.ts       # Multi-account switcher data
+**Client Table Columns**:
+| Column | Description | Styling |
+|--------|-------------|---------|
+| Client Name | Store name with external link on hover | Left-aligned, bold |
+| New (48h) | Violations in last 48 hours | Orange when > 0 |
+| This Week | Violations in last 7 days | Orange when > 0 |
+| Resolved (Month) | Resolutions this month | Teal when > 0 |
+| Resolved (Week) | Resolutions this week | Teal when > 0 |
+| Active Violations | Total active count | Plain text |
+| High Impact | Count of high-impact violations | Amber/bold when > 0 |
+| Revenue At-Risk | Dollar amount | Full format: $742,157 |
 
-types/
-└── index.ts                   # All TypeScript interfaces
+**Row Highlighting**:
+- Orange left border + background: Clients with new activity or 3+ high impact
+- Hover: Orange left border appears
 
-middleware.ts                  # Subdomain extraction & auth
-```
+### Per-Client Violation View (`/team/client/[subdomain]`)
+
+**Features**:
+- View all violations for a specific client
+- Filter by status, time period, search
+- **Inline editing** of violation fields
+- Bulk status updates
+- Move violations to resolved tab
+- Documents needed management
+
+**Editable Fields** (via modal):
+- Status (dropdown)
+- Action Taken (text)
+- Next Steps (text)
+- Options (text)
+- Notes (text)
+- Documents Needed (text) - Column N for active violations
 
 ---
 
@@ -108,22 +151,36 @@ middleware.ts                  # Subdomain extraction & auth
 **Tab**: `All Seller Information`
 **Range**: Columns A-N
 
-| Column | Field | Description | Example |
-|--------|-------|-------------|---------|
-| A | StoreName | Client identifier, often used as subdomain | `Alwayz On Sale` |
-| B | MerchantId | Amazon Merchant ID | `AXXXXXX` |
-| C | Email | Authorized user email | `client@example.com` |
-| D | Link to Sheet | URL to client's violations Google Sheet | `https://docs.google.com/spreadsheets/d/XXXXX/edit` |
-| E | Total Violations | Count of all violations | `45` |
-| F | Violations Last 7 Days | Recent violation count | `5` |
-| G | Violations Last 2 Days | Very recent count | `2` |
-| H | At Risk Sales | Dollar amount | `$12,500.00` |
-| I | High Impact Count | High severity violations | `3` |
-| J | Resolved Count | Resolved violations | `30` |
-| K | (unused) | - | - |
-| L | Subdomain URL | Full subdomain | `alwayz-on-sale.sellercentry.com` |
-| M | (unused) | - | - |
-| N | Document Folder URL | Google Drive folder link | `https://drive.google.com/...` |
+| Column | Index | Field | Description | Example |
+|--------|-------|-------|-------------|---------|
+| A | 0 | StoreName | Client identifier | `Alwayz On Sale` |
+| B | 1 | MerchantId | Amazon Merchant ID | `AXXXXXX` |
+| C | 2 | Email | Authorized user email | `client@example.com` |
+| D | 3 | Link to Sheet | URL to violations sheet | `https://docs.google.com/...` |
+| E | 4 | Count of Total Violations | Active violation count | `115` |
+| F | 5 | Count Violations Last 7 Days | Weekly count (IMPORTRANGE) | `5` |
+| G | 6 | Count Violations Last 2 Days | 48h count (IMPORTRANGE) | `2` |
+| H | 7 | Total At Risk Sales | Dollar amount | `$742,157` |
+| I | 8 | Count of High Impact | High severity count | `4` |
+| J | 9 | Total Resolved Violations | All-time resolved | `44` |
+| K | 10 | (unused) | - | - |
+| L | 11 | Subdomain URL | Full subdomain | `alwayz-on-sale.sellercentry.com` |
+| M | 12 | (unused) | - | - |
+| N | 13 | Document Folder URL | Google Drive folder | `https://drive.google.com/...` |
+
+**Master Sheet Formulas** (for reference):
+```
+Count of Total Violations (E):
+=LET(data, IMPORTRANGE(D2, "'All Current Violations'!C2:E"), colC, INDEX(data,,1), colE, INDEX(data,,3), IFERROR(ROWS(FILTER(colC, (colC<>"") + (colE<>""))), 0))
+
+Count Violations Last 7 Days (F):
+=COUNTIF(IMPORTRANGE(D2, "'All Current Violations'!D2:D"), ">="&TODAY()-7)
+
+Count Violations Last 2 Days (G):
+=COUNTIF(IMPORTRANGE(D2, "'All Current Violations'!D2:D"), ">="&TODAY()-2)
+```
+
+> **IMPORTANT**: The team dashboard does NOT use these pre-calculated values. It fetches actual violation data and calculates counts from the date field (Column D) for accuracy.
 
 ### 2. Client Violations Sheets (Per-Client)
 
@@ -142,24 +199,26 @@ Each client has their own Google Sheet with two tabs:
 - `Closed Violations`
 - `All Closed Violations`
 
-**Range**: Columns A-N
+**Violations Sheet Columns (A-N)**:
 
-| Column | Field | Description | Example |
-|--------|-------|-------------|---------|
-| A | Violation ID | 12-character hash | `abc123def456` |
-| B | ImportedAt | Import date | `2024-01-15` |
-| C | Reason | Violation type | `Product Authenticity` |
-| D | Date | Date Amazon flagged | `2024-01-10` |
-| E | ASIN | Amazon product code | `B08XXXXXX` |
-| F | Product Title | Full product name | `Widget Pro Max 2024` |
-| G | At Risk Sales | Dollar amount with $ | `$1,250.00` |
-| H | Action Taken | What was done | `Listing removed pending appeal` |
-| I | AHR Impact | Impact level | `High`, `Low`, or `No impact` |
-| J | Next Steps | Action items | `Submit invoice by Friday` |
-| K | Options | Available options | `Appeal, Accept, Request clarification` |
-| L | Status | Current status | `Working`, `Submitted`, etc. |
-| M | Notes | Internal notes | `Waiting for supplier docs` |
-| N | Date Resolved | Resolution date (resolved only) | `2024-01-20` |
+| Column | Index | Field | Description | Editable |
+|--------|-------|-------|-------------|----------|
+| A | 0 | Violation ID | 12-character hash | ❌ |
+| B | 1 | ImportedAt | Import date | ❌ |
+| C | 2 | Reason | Violation type | ❌ |
+| D | 3 | Date | Date Amazon flagged (for time calculations) | ❌ |
+| E | 4 | ASIN | Amazon product code | ❌ |
+| F | 5 | Product Title | Full product name | ❌ |
+| G | 6 | At Risk Sales | Dollar amount | ❌ |
+| H | 7 | Action Taken | What was done | ✅ |
+| I | 8 | AHR Impact | Impact level | ✅ |
+| J | 9 | Next Steps | Action items | ✅ |
+| K | 10 | Options | Available options | ✅ |
+| L | 11 | Status | Current status | ✅ |
+| M | 12 | Notes | Internal notes | ✅ |
+| N | 13 | Docs Needed / Date Resolved | Shared column | ✅ |
+
+> **Column N is shared**: For active violations, it stores "Documents Needed". For resolved violations, it stores "Date Resolved".
 
 ### Status Values (ViolationStatus)
 ```typescript
@@ -182,69 +241,16 @@ type ViolationStatus =
 
 ---
 
-## Google Sheets API Integration
-
-### Current Implementation (`lib/google/sheets.ts`)
-
-**Authentication**: Google Service Account
-```typescript
-const auth = new google.auth.GoogleAuth({
-  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY),
-  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'], // READ-ONLY
-});
-```
-
-**CRITICAL**: Current scope is `spreadsheets.readonly` - must change to `spreadsheets` for write access.
-
-### Current Functions (READ-ONLY)
-
-#### `getTenantBySubdomain(subdomain: string): Promise<Tenant | null>`
-Looks up client in Master Sheet by subdomain (Column L or Column A fallback).
-
-```typescript
-// How it finds the client:
-// 1. Build expected URL: `${subdomain}.sellercentry.com`
-// 2. Match against Column L (full subdomain URL)
-// 3. Fallback: Match Column A (store name) case-insensitively
-```
-
-#### `getViolations(tenant: Tenant, tab: 'active' | 'resolved'): Promise<Violation[]>`
-Fetches violations from client's sheet.
-
-```typescript
-// Process:
-// 1. Extract sheet ID from tenant.sheetUrl
-// 2. Try tab name variations until one works
-// 3. Parse rows, skip header, skip empty rows
-// 4. Normalize status and impact values
-// 5. Return Violation[] array
-```
-
-#### `filterViolations(violations, { timeFilter, status, search }): Violation[]`
-In-memory filtering of violations by time range, status, and search terms.
-
-#### `getSubdomainsByEmail(email: string): Promise<string[]>`
-Returns all subdomains assigned to an email (for multi-account users).
-
-#### `getAccountsByEmail(email: string): Promise<{ subdomain: string; storeName: string }[]>`
-Returns subdomain + store name pairs. **Master users** (e.g., `joe@marketools.io`) see ALL accounts.
-
-### Master User System
-```typescript
-const MASTER_USER_EMAILS = ['joe@marketools.io'];
-// Master users bypass email filtering and see all client accounts
-```
-
----
-
 ## API Endpoints Reference
 
-### GET `/api/tenant`
-Fetch tenant metadata by subdomain.
+### Team Client Endpoints
+
+#### GET `/api/team/clients`
+Fetch all clients with calculated metrics.
 
 **Request**:
 ```
-GET /api/tenant?subdomain=alwayz-on-sale
+GET /api/team/clients?detailed=true
 ```
 
 **Response**:
@@ -252,38 +258,35 @@ GET /api/tenant?subdomain=alwayz-on-sale
 {
   "success": true,
   "data": {
-    "storeName": "Alwayz On Sale",
-    "merchantId": "AXXXXX",
-    "email": "client@example.com",
-    "sheetUrl": "https://docs.google.com/spreadsheets/d/XXXX/edit",
-    "totalViolations": 45,
-    "violationsLast7Days": 5,
-    "violationsLast2Days": 2,
-    "atRiskSales": 12500,
-    "highImpactCount": 3,
-    "resolvedCount": 30,
-    "subdomain": "alwayz-on-sale.sellercentry.com",
-    "documentFolderUrl": "https://drive.google.com/..."
+    "clients": [
+      {
+        "storeName": "AlphaDailyDeals",
+        "subdomain": "alpha-daily-deals",
+        "email": "client@example.com",
+        "sheetUrl": "https://docs.google.com/...",
+        "violations48h": 2,
+        "violationsThisWeek": 5,
+        "resolvedThisMonth": 4,
+        "resolvedThisWeek": 2,
+        "activeViolations": 115,
+        "highImpactCount": 4,
+        "atRiskSales": 742157
+      }
+    ],
+    "total": 30
   }
 }
 ```
 
-### GET `/api/violations`
-Fetch violations with optional filtering.
+> **Note**: Metrics are calculated from actual violation dates, not master sheet values.
+
+#### GET `/api/team/violations`
+Fetch violations for a specific client (team view includes docsNeeded).
 
 **Request**:
 ```
-GET /api/violations?subdomain=alwayz-on-sale&tab=active&time=7days&status=Working&search=B08
+GET /api/team/violations?subdomain=alpha-daily-deals&tab=active
 ```
-
-**Query Parameters**:
-| Param | Values | Default |
-|-------|--------|---------|
-| subdomain | string (required) | - |
-| tab | `active`, `resolved` | `active` |
-| time | `all`, `7days`, `30days` | `all` |
-| status | ViolationStatus or `all` | `all` |
-| search | string (ASIN/title) | `''` |
 
 **Response**:
 ```json
@@ -291,291 +294,19 @@ GET /api/violations?subdomain=alwayz-on-sale&tab=active&time=7days&status=Workin
   "success": true,
   "data": {
     "violations": [...],
-    "total": 15
+    "total": 115
   }
 }
 ```
 
-### POST `/api/ticket`
-Submit support ticket (sends email via Resend).
+#### PATCH `/api/team/violations/update`
+Update a single violation.
 
 **Request**:
 ```json
 {
-  "subject": "Question",
-  "message": "Need help with violation...",
-  "asin": "B08XXXXXX",
-  "storeName": "Alwayz On Sale",
-  "userEmail": "client@example.com"
-}
-```
-
-**Subject Options**: `Question`, `Document Request`, `Status Update`, `Other`
-
-**Response**:
-```json
-{ "success": true }
-```
-
-### GET `/api/user-subdomain`
-Get all accounts for a user (for account switcher).
-
-**Request**:
-```
-GET /api/user-subdomain
-GET /api/user-subdomain?email=user@example.com
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "data": {
-    "email": "user@example.com",
-    "subdomains": ["alwayz-on-sale", "store-two"],
-    "accounts": [
-      { "subdomain": "alwayz-on-sale", "storeName": "Alwayz On Sale" },
-      { "subdomain": "store-two", "storeName": "Store Two" }
-    ],
-    "primarySubdomain": "alwayz-on-sale"
-  }
-}
-```
-
----
-
-## Authentication System
-
-### Supabase Auth
-- **Provider**: Supabase (email/password + Google OAuth)
-- **Session Storage**: HTTP-only cookies
-- **Token Refresh**: Handled in middleware
-
-### Auth Flow
-
-1. **Email/Password Sign In** (`app/(auth)/actions.ts`)
-   ```typescript
-   signInWithEmail(formData) → supabase.auth.signInWithPassword()
-   // On generic domain: looks up user's subdomain and redirects there
-   ```
-
-2. **Google OAuth** (`app/(auth)/actions.ts`)
-   ```typescript
-   signInWithGoogle() → supabase.auth.signInWithOAuth({ provider: 'google' })
-   // Callback: /auth/callback
-   ```
-
-3. **OAuth Callback** (`app/auth/callback/route.ts`)
-   - Exchanges auth code for session
-   - Handles recovery and invite flows
-   - Redirects to user's primary subdomain
-
-4. **Session Check** (`lib/supabase/middleware.ts`)
-   ```typescript
-   updateSession(request) → { supabaseResponse, user }
-   // Refreshes tokens, returns user if authenticated
-   ```
-
-### Authorization Levels
-
-1. **Clients**: Can only access their own subdomain (email must match Column C)
-2. **Admins**: Listed in `ADMIN_EMAILS` env var - can access any subdomain
-3. **Master Users**: Hardcoded in `sheets.ts` - see all accounts in switcher
-
----
-
-## Subdomain Routing System
-
-### Middleware Logic (`middleware.ts`)
-
-```typescript
-// Subdomain extraction priority:
-1. Query param: ?tenant=subdomain (local dev)
-2. Hostname: subdomain.localhost:3000 (local dev)
-3. Production: subdomain.sellercentry.com
-4. Preview: subdomain.seller-centry-platform.vercel.app
-5. Vercel preview: tenant---branch.vercel.app
-```
-
-### Route Handling
-
-```typescript
-// Public routes (no rewrite, no auth):
-const publicRoutes = ['/login', '/auth/callback', '/auth/setup-password', '/forgot-password', '/unauthorized'];
-
-// Protected routes:
-// 1. Check auth - redirect to /login if not authenticated
-// 2. Rewrite: / → /s/{subdomain}/
-// 3. Dashboard page verifies email matches tenant or user is admin
-```
-
-### Internal Rewriting
-```
-User visits: https://alwayz-on-sale.sellercentry.com/
-Middleware rewrites to: /s/alwayz-on-sale/
-Component: app/s/[subdomain]/page.tsx
-```
-
----
-
-## Data Types & Interfaces
-
-### Complete Type Definitions (`types/index.ts`)
-
-```typescript
-// Tenant data from Client Mapping Sheet
-export interface Tenant {
-  storeName: string;           // Column A
-  merchantId: string;          // Column B
-  email: string;               // Column C (authorized user)
-  sheetUrl: string;            // Column D
-  totalViolations: number;     // Column E
-  violationsLast7Days: number; // Column F
-  violationsLast2Days: number; // Column G
-  atRiskSales: number;         // Column H
-  highImpactCount: number;     // Column I
-  resolvedCount: number;       // Column J
-  subdomain: string;           // Column L
-  documentFolderUrl?: string;  // Column N
-}
-
-// Violation from client sheets
-export interface Violation {
-  id: string;                  // Column A
-  importedAt: string;          // Column B
-  reason: string;              // Column C
-  date: string;                // Column D
-  asin: string;                // Column E
-  productTitle: string;        // Column F
-  atRiskSales: number;         // Column G
-  actionTaken: string;         // Column H
-  ahrImpact: 'High' | 'Medium' | 'Low' | 'No impact'; // Column I
-  nextSteps: string;           // Column J
-  options: string;             // Column K
-  status: ViolationStatus;     // Column L
-  notes: string;               // Column M
-  dateResolved?: string;       // Column N
-}
-
-export type ViolationStatus =
-  | 'Assessing'
-  | 'Working'
-  | 'Waiting on Client'
-  | 'Submitted'
-  | 'Review Resolved'
-  | 'Denied'
-  | 'Ignored'
-  | 'Resolved'
-  | 'Acknowledged';
-
-export type ViolationTab = 'active' | 'resolved';
-export type TimeFilter = 'all' | '7days' | '30days';
-
-export interface ViolationsFilter {
-  tab: ViolationTab;
-  timeFilter: TimeFilter;
-  status: ViolationStatus | 'all';
-  search: string;
-}
-
-export interface UserAccount {
-  subdomain: string;
-  storeName: string;
-}
-
-// API Response types
-export interface TenantResponse {
-  success: boolean;
-  data?: Tenant;
-  error?: string;
-}
-
-export interface ViolationsResponse {
-  success: boolean;
-  data?: {
-    violations: Violation[];
-    total: number;
-  };
-  error?: string;
-}
-```
-
----
-
-## Current Capabilities vs. Needed Capabilities
-
-### What EXISTS Now (Read-Only)
-
-| Capability | Status | Implementation |
-|------------|--------|----------------|
-| Read tenant metadata | ✅ | `getTenantBySubdomain()` |
-| Read active violations | ✅ | `getViolations(tenant, 'active')` |
-| Read resolved violations | ✅ | `getViolations(tenant, 'resolved')` |
-| Filter violations | ✅ | `filterViolations()` |
-| Search by ASIN/title | ✅ | In-memory search |
-| View violation details | ✅ | Case detail modal |
-| Submit tickets (email) | ✅ | `/api/ticket` → Resend |
-| Export to CSV | ✅ | Client-side generation |
-| Multi-account switcher | ✅ | For master users |
-
-### What DOES NOT EXIST (Needed for Write)
-
-| Capability | Status | What's Needed |
-|------------|--------|---------------|
-| Update violation status | ❌ | Google Sheets API update |
-| Edit violation notes | ❌ | Google Sheets API update |
-| Edit action taken | ❌ | Google Sheets API update |
-| Edit next steps | ❌ | Google Sheets API update |
-| Mark as resolved | ❌ | Move row between tabs |
-| Add new violation | ❌ | Google Sheets API append |
-| Delete violation | ❌ | Google Sheets API delete |
-| Bulk updates | ❌ | Batch update API |
-| Update tenant stats | ❌ | Write to mapping sheet |
-| Audit trail | ❌ | No logging exists |
-
----
-
-## Internal Tool Requirements
-
-### 1. Google Sheets Write Operations Needed
-
-**Change API Scope**:
-```typescript
-// FROM:
-scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
-
-// TO:
-scopes: ['https://www.googleapis.com/auth/spreadsheets']
-```
-
-**Service Account Permissions**: Ensure service account has Editor access to all client sheets.
-
-### 2. New API Endpoints Needed
-
-#### `PATCH /api/violations/[id]`
-Update a single violation field.
-
-```typescript
-// Request
-PATCH /api/violations/abc123def456
-{
-  "subdomain": "alwayz-on-sale",
-  "field": "status",
-  "value": "Submitted"
-}
-
-// Response
-{ "success": true, "data": { ...updatedViolation } }
-```
-
-#### `PUT /api/violations/[id]`
-Update multiple fields at once.
-
-```typescript
-// Request
-PUT /api/violations/abc123def456
-{
-  "subdomain": "alwayz-on-sale",
+  "subdomain": "alpha-daily-deals",
+  "violationId": "abc123def456",
   "updates": {
     "status": "Submitted",
     "notes": "Appeal submitted 12/27",
@@ -584,212 +315,302 @@ PUT /api/violations/abc123def456
 }
 ```
 
-#### `POST /api/violations/resolve`
-Move violation from active to resolved tab.
+**Updatable Fields**:
+- `actionTaken` → Column H
+- `ahrImpact` → Column I
+- `nextSteps` → Column J
+- `options` → Column K
+- `status` → Column L
+- `notes` → Column M
+- `docsNeeded` → Column N (active tab only)
 
-```typescript
-// Request
-POST /api/violations/resolve
-{
-  "subdomain": "alwayz-on-sale",
-  "violationId": "abc123def456",
-  "dateResolved": "2024-12-27"
-}
+**Response**:
+```json
+{ "success": true }
 ```
 
-#### `POST /api/violations/bulk-update`
+#### PATCH `/api/team/violations/bulk-update`
 Update multiple violations at once.
 
-```typescript
-// Request
-POST /api/violations/bulk-update
+**Request**:
+```json
 {
-  "subdomain": "alwayz-on-sale",
+  "subdomain": "alpha-daily-deals",
   "updates": [
-    { "id": "abc123", "status": "Working" },
-    { "id": "def456", "status": "Submitted" }
+    { "violationId": "abc123", "status": "Working" },
+    { "violationId": "def456", "status": "Submitted", "notes": "Done" }
   ]
 }
 ```
 
-### 3. Google Sheets API Write Methods
+#### POST `/api/team/violations/resolve`
+Move violation from active to resolved tab.
 
-```typescript
-// Update single cell
-await sheets.spreadsheets.values.update({
-  spreadsheetId: sheetId,
-  range: `'All Current Violations'!L5`,  // Column L, Row 5
-  valueInputOption: 'USER_ENTERED',
-  requestBody: { values: [['Submitted']] }
-});
-
-// Update row (multiple cells)
-await sheets.spreadsheets.values.update({
-  spreadsheetId: sheetId,
-  range: `'All Current Violations'!H5:M5`,  // Columns H-M, Row 5
-  valueInputOption: 'USER_ENTERED',
-  requestBody: {
-    values: [['Action taken', 'High', 'Next steps', 'Options', 'Submitted', 'Notes']]
-  }
-});
-
-// Append new row
-await sheets.spreadsheets.values.append({
-  spreadsheetId: sheetId,
-  range: `'All Current Violations'!A:N`,
-  valueInputOption: 'USER_ENTERED',
-  insertDataOption: 'INSERT_ROWS',
-  requestBody: { values: [[...newRowData]] }
-});
-
-// Delete row (via batchUpdate)
-await sheets.spreadsheets.batchUpdate({
-  spreadsheetId: sheetId,
-  requestBody: {
-    requests: [{
-      deleteDimension: {
-        range: { sheetId: tabSheetId, dimension: 'ROWS', startIndex: 4, endIndex: 5 }
-      }
-    }]
-  }
-});
+**Request**:
+```json
+{
+  "subdomain": "alpha-daily-deals",
+  "violationId": "abc123def456"
+}
 ```
 
-### 4. Internal Tool Subdomain Setup
+**Process**:
+1. Find row in active tab by Violation ID
+2. Read full row data (A-N)
+3. Set Column N to current date (dateResolved)
+4. Append to resolved tab
+5. Delete from active tab
 
-**Option A**: Dedicated subdomain `team.sellercentry.com`
-- Add to middleware's subdomain detection
-- Create new dashboard variant for team use
-- Different authorization logic (team emails only)
+---
 
-**Option B**: Use existing system with master user enhancement
-- Enhance master user capabilities to include writes
-- Add "Edit Mode" toggle in existing dashboard
-- Less routing changes needed
+## Authentication & Authorization
 
-### 5. UI Enhancements for Editing
+### Team Member Emails
 
-**Inline Editing**:
-- Click-to-edit status dropdown
-- Click-to-edit notes field
-- Auto-save or explicit save button
-
-**Bulk Actions**:
-- Checkbox selection on table rows
-- Bulk status change dropdown
-- Bulk resolve action
-
-**Audit Trail** (Recommended):
-- Add columns for `LastModifiedAt` and `LastModifiedBy` in sheets
-- Log changes with timestamps
-
-### 6. Authorization for Internal Tool
+Defined in `lib/auth/team.ts`:
 
 ```typescript
-// Team member emails (for internal tool access)
-const TEAM_EMAILS = [
+const DEFAULT_TEAM_EMAILS = [
   'joe@sellercentry.com',
-  'kristen@sellercentry.com',
+  'kml@marketools.io',
+  'info@sellercentry.com',
   'joe@marketools.io',
-  // Add more team members
 ];
+```
 
-// Check in middleware or API routes
-function isTeamMember(email: string): boolean {
-  return TEAM_EMAILS.includes(email.toLowerCase());
+Can be overridden via environment variable:
+```env
+TEAM_EMAILS=joe@sellercentry.com,kml@marketools.io
+```
+
+### Authorization Check
+
+```typescript
+import { isTeamMember } from '@/lib/auth/team';
+
+// In API routes:
+if (!isTeamMember(user.email)) {
+  return NextResponse.json(
+    { success: false, error: 'Access denied - not a team member' },
+    { status: 403 }
+  );
 }
+```
+
+### Team Layout Protection
+
+The `app/team/layout.tsx` checks authentication and team membership before rendering any team pages.
+
+---
+
+## Data Types & Interfaces
+
+### ClientOverview (Team Dashboard)
+
+```typescript
+export interface ClientOverview {
+  storeName: string;
+  subdomain: string;
+  email: string;
+  sheetUrl: string;
+  violations48h: number;      // Calculated from violation dates
+  violationsThisWeek: number; // Calculated from violation dates (7 days)
+  resolvedThisMonth: number;  // Approximated from resolved data
+  resolvedThisWeek: number;   // Calculated from resolved dates
+  activeViolations: number;   // Total count of active violations
+  highImpactCount: number;    // Count where ahrImpact === 'High'
+  atRiskSales: number;        // Sum of all atRiskSales
+}
+```
+
+### Violation (with Team Fields)
+
+```typescript
+export interface Violation {
+  id: string;                  // Column A
+  importedAt: string;          // Column B
+  reason: string;              // Column C
+  date: string;                // Column D - USED FOR TIME CALCULATIONS
+  asin: string;                // Column E
+  productTitle: string;        // Column F
+  atRiskSales: number;         // Column G
+  actionTaken: string;         // Column H ✏️ Editable
+  ahrImpact: 'High' | 'Low' | 'No impact'; // Column I ✏️ Editable
+  nextSteps: string;           // Column J ✏️ Editable
+  options: string;             // Column K ✏️ Editable
+  status: ViolationStatus;     // Column L ✏️ Editable
+  notes: string;               // Column M ✏️ Editable
+  dateResolved?: string;       // Column N (resolved tab only)
+  docsNeeded?: string;         // Column N (active tab only) ✏️ Editable
+}
+```
+
+### Column Mapping for Updates
+
+```typescript
+const VIOLATION_COLUMN_MAP: Record<string, string> = {
+  actionTaken: 'H',
+  ahrImpact: 'I',
+  nextSteps: 'J',
+  options: 'K',
+  status: 'L',
+  notes: 'M',
+  docsNeeded: 'N',
+};
 ```
 
 ---
 
-## Implementation Considerations
+## Violation Metrics Calculation
 
-### Data Consistency
-- Google Sheets has no transactions - consider optimistic UI updates
-- Row indices can shift if rows are added/deleted - use Violation ID for lookups
-- Consider caching sheet tab IDs to avoid repeated lookups
+### Why Not Use Master Sheet Values?
 
-### Finding Row by Violation ID
+The master sheet has pre-calculated columns (E, F, G) using IMPORTRANGE formulas, but:
+1. IMPORTRANGE may not refresh immediately
+2. Values can become stale
+3. Data inconsistencies were observed between sheet and app
+
+### Current Calculation Method
+
+The team dashboard fetches actual violation data from each client's sheet and calculates metrics from the **date field (Column D)**:
+
 ```typescript
-async function findRowByViolationId(sheetId: string, tabName: string, violationId: string) {
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: `'${tabName}'!A:A`,  // Column A = Violation ID
-  });
+function calculateViolationMetrics(violations: Violation[]) {
+  const now = new Date();
+  const cutoff48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+  const cutoff7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const rows = response.data.values || [];
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i][0] === violationId) {
-      return i + 1; // 1-indexed for Sheets API
-    }
+  let last48h = 0;
+  let last7Days = 0;
+
+  for (const violation of violations) {
+    const violationDate = new Date(violation.date); // Column D
+
+    if (violationDate >= cutoff48h) last48h++;
+    if (violationDate >= cutoff7Days) last7Days++;
   }
-  return null;
+
+  return { total: violations.length, last48h, last7Days, ... };
 }
 ```
 
-### Moving Between Tabs (Resolve/Unresolve)
-```typescript
-async function resolveViolation(sheetId: string, violationId: string) {
-  // 1. Find row in active tab
-  const activeRow = await findRowByViolationId(sheetId, 'All Current Violations', violationId);
-
-  // 2. Read the full row data
-  const rowData = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: `'All Current Violations'!A${activeRow}:N${activeRow}`,
-  });
-
-  // 3. Append to resolved tab (with dateResolved)
-  const resolvedData = [...rowData.data.values[0]];
-  resolvedData[13] = new Date().toISOString().split('T')[0]; // Column N = dateResolved
-
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: sheetId,
-    range: `'All Resolved Violations'!A:N`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [resolvedData] }
-  });
-
-  // 4. Delete from active tab
-  // (Need tab sheetId for delete - get via spreadsheets.get)
-}
+This matches the Google Sheets formula logic:
+```
+=COUNTIF(IMPORTRANGE(D2, "'All Current Violations'!D2:D"), ">="&TODAY()-7)
 ```
 
-### Error Handling
+### Batch Processing
+
+To avoid rate limits when fetching from ~30 client sheets:
+- Process in batches of 5 clients
+- 200ms delay between batches
+- 2 retries with 500ms base delay for each fetch
+- Results cached for 2 minutes
+
+---
+
+## Rate Limiting & Caching
+
+### Cache Configuration
+
 ```typescript
-// Always handle Google API errors
-try {
-  await sheets.spreadsheets.values.update({...});
-} catch (error) {
-  if (error.code === 403) {
-    // Permission denied - service account lacks access
-  } else if (error.code === 404) {
-    // Sheet or range not found
-  } else if (error.code === 429) {
-    // Rate limited - implement exponential backoff
+const CACHE_TTL = {
+  clients: 2 * 60 * 1000,  // 2 minutes for client list
+  tenants: 5 * 60 * 1000,  // 5 minutes for tenant data
+};
+```
+
+### Throttling
+
+```typescript
+const MAX_CONCURRENT_REQUESTS = 3;
+```
+
+Requests queue when max is reached.
+
+### Retry Logic
+
+```typescript
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 1000
+): Promise<T>
+```
+
+Exponential backoff: 1s, 2s, 4s for rate limit errors.
+
+---
+
+## UI Components
+
+### KPI Card
+
+```tsx
+<KpiCard
+  label="Total Clients"
+  value={30}
+  icon={Users}
+  labelColor="text-gray-500"
+  iconBgColor="bg-gray-50"
+  iconColor="text-gray-400"
+/>
+```
+
+Colors by metric type:
+- Total Clients: Gray
+- Needs Attention: Amber
+- New (48H): Orange
+- At-Risk Revenue: Red
+- Resolved: Teal
+
+### Filter Button (Pill Style)
+
+```tsx
+<FilterButton
+  label="All Clients"
+  active={true}
+  onClick={() => setFilter('all')}
+/>
+```
+
+Active state: Dark gradient background
+Inactive state: White/surface with border
+
+### Revenue Formatting
+
+- **Table cells**: Full format `$742,157` using `Intl.NumberFormat`
+- **KPI cards**: Abbreviated `$17.2M` for large numbers
+
+### Row Styling
+
+```tsx
+<tr className={`
+  border-l-[3px] hover:border-l-orange-500
+  ${hasActivity || hasHighImpact
+    ? 'bg-orange-50/50 border-l-orange-500'
+    : 'border-l-transparent'
   }
-  throw error;
-}
+`}>
 ```
 
 ---
 
 ## Environment Variables
 
-**Required** (already in use):
+**Required**:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://byaaliobjjdffkhnxytv.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
 SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
-GOOGLE_SERVICE_ACCOUNT_KEY=<stringified_json>
+GOOGLE_SERVICE_ACCOUNT_KEY=<stringified_json>  # Must have write scope
 NEXT_PUBLIC_ROOT_DOMAIN=sellercentry.com
 RESEND_API_KEY=<resend_key>
 ```
 
-**Optional/Recommended**:
+**Optional**:
 ```env
-ADMIN_EMAILS=admin1@example.com,admin2@example.com
-TEAM_EMAILS=joe@sellercentry.com,kristen@sellercentry.com  # New for internal tool
+TEAM_EMAILS=joe@sellercentry.com,kml@marketools.io
 ```
 
 ---
@@ -799,7 +620,7 @@ TEAM_EMAILS=joe@sellercentry.com,kristen@sellercentry.com  # New for internal to
 ### Client Mapping Sheet (A-N)
 ```
 A: StoreName | B: MerchantId | C: Email | D: SheetUrl | E: TotalViolations
-F: Last7Days | G: Last2Days | H: AtRiskSales | I: HighImpact | J: Resolved
+F: Last7Days | G: Last2Days | H: AtRiskSales | I: HighImpact | J: ResolvedTotal
 K: (unused) | L: SubdomainURL | M: (unused) | N: DocumentFolderUrl
 ```
 
@@ -807,26 +628,29 @@ K: (unused) | L: SubdomainURL | M: (unused) | N: DocumentFolderUrl
 ```
 A: ViolationId | B: ImportedAt | C: Reason | D: Date | E: ASIN
 F: ProductTitle | G: AtRiskSales | H: ActionTaken | I: AHRImpact
-J: NextSteps | K: Options | L: Status | M: Notes | N: DateResolved
+J: NextSteps | K: Options | L: Status | M: Notes | N: DocsNeeded/DateResolved
+```
+
+### Editable Columns (Team Tool)
+```
+H: ActionTaken | I: AHRImpact | J: NextSteps | K: Options
+L: Status | M: Notes | N: DocsNeeded (active only)
 ```
 
 ---
 
 ## Summary
 
-This context document provides everything needed to plan an internal team tool:
+The internal team tool is **fully implemented** with:
 
-1. **Data lives in Google Sheets** - two types: mapping sheet and per-client violation sheets
-2. **Current system is READ-ONLY** - scope change and new functions needed for writes
-3. **Authentication via Supabase** - team authorization can be added via email list
-4. **Subdomain routing works** - can add new subdomain or enhance existing master user flow
-5. **API patterns established** - follow same patterns for new write endpoints
-6. **Column mappings documented** - know exactly where to read/write data
-
-The internal tool will need:
-- Google Sheets write scope
-- New API endpoints for updates
-- Row lookup by Violation ID
-- Team member authorization
-- UI components for editing
-- Optional audit trail columns
+✅ Team subdomain at `team.sellercentry.com`
+✅ Client overview dashboard with real-time metrics
+✅ Per-client violation management
+✅ Full CRUD operations on violations
+✅ Bulk update support
+✅ Resolve/unresolve workflow
+✅ Documents needed tracking
+✅ PDF export for document requests
+✅ Accurate time-based metrics from actual violation dates
+✅ Rate limiting and caching for API stability
+✅ Team member authorization
