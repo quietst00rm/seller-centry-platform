@@ -342,6 +342,7 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
                 <SortableHeader label="NEW (48H)" sortKeyName="violations48h" />
                 <SortableHeader label="THIS WEEK" sortKeyName="violationsThisWeek" />
                 <SortableHeader label="HIGH IMPACT" sortKeyName="highImpactCount" />
+                <SortableHeader label="NEEDS INVOICE" sortKeyName="needsInvoiceCount" />
                 <SortableHeader label="NEEDS DOCS" sortKeyName="needsDocsCount" />
                 <SortableHeader label="RESOLVED (WEEK)" sortKeyName="resolvedThisWeek" />
                 <SortableHeader label="RESOLVED (MONTH)" sortKeyName="resolvedThisMonth" />
@@ -412,10 +413,19 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
                       )}
                     </td>
 
+                    {/* Needs Invoice */}
+                    <td className="px-6 py-5 text-center">
+                      {client.needsInvoiceCount > 0 ? (
+                        <span className="text-orange-600 dark:text-orange-400 font-semibold">{client.needsInvoiceCount}</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">0</span>
+                      )}
+                    </td>
+
                     {/* Needs Docs */}
                     <td className="px-6 py-5 text-center">
                       {client.needsDocsCount > 0 ? (
-                        <span className="text-purple-600 dark:text-purple-400 font-semibold">{client.needsDocsCount}</span>
+                        <span className="text-orange-600 dark:text-orange-400 font-semibold">{client.needsDocsCount}</span>
                       ) : (
                         <span className="text-gray-300 dark:text-gray-600">0</span>
                       )}

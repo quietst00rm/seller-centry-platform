@@ -632,6 +632,7 @@ function calculateViolationMetrics(violations: Violation[]): {
   last48h: number;
   last7Days: number;
   highImpact: number;
+  needsInvoice: number;
   needsDocs: number;
   atRiskSales: number;
 } {
@@ -642,6 +643,7 @@ function calculateViolationMetrics(violations: Violation[]): {
   let last48h = 0;
   let last7Days = 0;
   let highImpact = 0;
+  let needsInvoice = 0;
   let needsDocs = 0;
   let atRiskSales = 0;
 
@@ -662,9 +664,13 @@ function calculateViolationMetrics(violations: Violation[]): {
       highImpact++;
     }
 
-    // Count violations that need docs (docsNeeded is not "None" and not empty)
+    // Count violations that need docs
+    // needsInvoice: docsNeeded equals "Invoice" (case-insensitive)
+    // needsDocs: docsNeeded is not "None", not "Invoice", and not empty
     const docsValue = violation.docsNeeded?.trim().toLowerCase() || '';
-    if (docsValue && docsValue !== 'none') {
+    if (docsValue === 'invoice') {
+      needsInvoice++;
+    } else if (docsValue && docsValue !== 'none') {
       needsDocs++;
     }
 
@@ -676,6 +682,7 @@ function calculateViolationMetrics(violations: Violation[]): {
     last48h,
     last7Days,
     highImpact,
+    needsInvoice,
     needsDocs,
     atRiskSales,
   };
@@ -846,6 +853,7 @@ export async function getAllClientsWithMetrics(): Promise<ClientOverview[]> {
             resolvedThisMonth: resolvedMetrics.last7Days * 4, // Approximate monthly from weekly
             resolvedThisWeek: resolvedMetrics.last7Days,
             activeViolations: activeMetrics.total,
+            needsInvoiceCount: activeMetrics.needsInvoice,
             needsDocsCount: activeMetrics.needsDocs,
             highImpactCount: activeMetrics.highImpact,
             atRiskSales: activeMetrics.atRiskSales,
