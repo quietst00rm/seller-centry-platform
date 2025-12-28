@@ -335,17 +335,17 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
       <div className="bg-white dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse">
-            <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50/80 dark:bg-[#1a2027] border-b border-gray-200 dark:border-[#30363d] sticky top-0 backdrop-blur-sm z-10">
+            <thead className="text-sm text-gray-600 dark:text-gray-300 uppercase bg-gray-50/80 dark:bg-[#1a2027] border-b border-gray-200 dark:border-[#30363d] sticky top-0 backdrop-blur-sm z-10">
               <tr>
-                <SortableHeader label="Client Name" sortKeyName="storeName" className="text-left" />
-                <SortableHeader label="New (48h)" sortKeyName="violations48h" />
-                <SortableHeader label="This Week" sortKeyName="violationsThisWeek" />
-                <SortableHeader label="Resolved (Month)" sortKeyName="resolvedThisMonth" />
-                <SortableHeader label="Resolved (Week)" sortKeyName="resolvedThisWeek" />
-                <SortableHeader label="Active Violations" sortKeyName="activeViolations" />
-                <SortableHeader label="Needs Docs" sortKeyName="needsDocsCount" />
-                <SortableHeader label="High Impact" sortKeyName="highImpactCount" />
-                <SortableHeader label="Revenue At-Risk" sortKeyName="atRiskSales" />
+                <SortableHeader label="CLIENT NAME" sortKeyName="storeName" className="text-left" />
+                <SortableHeader label="ACTIVE VIOLATIONS" sortKeyName="activeViolations" />
+                <SortableHeader label="NEW (48H)" sortKeyName="violations48h" />
+                <SortableHeader label="THIS WEEK" sortKeyName="violationsThisWeek" />
+                <SortableHeader label="HIGH IMPACT" sortKeyName="highImpactCount" />
+                <SortableHeader label="NEEDS DOCS" sortKeyName="needsDocsCount" />
+                <SortableHeader label="RESOLVED (WEEK)" sortKeyName="resolvedThisWeek" />
+                <SortableHeader label="RESOLVED (MONTH)" sortKeyName="resolvedThisMonth" />
+                <SortableHeader label="REVENUE AT-RISK" sortKeyName="atRiskSales" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-[#30363d]">
@@ -378,6 +378,11 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
                       </div>
                     </td>
 
+                    {/* Active Violations */}
+                    <td className="px-6 py-5 text-center text-gray-900 dark:text-gray-300">
+                      {client.activeViolations}
+                    </td>
+
                     {/* New (48h) */}
                     <td className="px-6 py-5 text-center">
                       {client.violations48h > 0 ? (
@@ -396,10 +401,21 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
                       )}
                     </td>
 
-                    {/* Resolved (Month) */}
+                    {/* High Impact */}
                     <td className="px-6 py-5 text-center">
-                      {client.resolvedThisMonth > 0 ? (
-                        <span className="text-teal-600 dark:text-teal-400 font-semibold">{client.resolvedThisMonth}</span>
+                      {client.highImpactCount > 0 ? (
+                        <span className="text-amber-700 dark:text-amber-500 font-bold">
+                          {client.highImpactCount}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">0</span>
+                      )}
+                    </td>
+
+                    {/* Needs Docs */}
+                    <td className="px-6 py-5 text-center">
+                      {client.needsDocsCount > 0 ? (
+                        <span className="text-purple-600 dark:text-purple-400 font-semibold">{client.needsDocsCount}</span>
                       ) : (
                         <span className="text-gray-300 dark:text-gray-600">0</span>
                       )}
@@ -414,26 +430,10 @@ export function ClientTable({ clients, onRefresh, isRefreshing }: ClientTablePro
                       )}
                     </td>
 
-                    {/* Active Violations */}
-                    <td className="px-6 py-5 text-center text-gray-900 dark:text-gray-300">
-                      {client.activeViolations}
-                    </td>
-
-                    {/* Needs Docs */}
+                    {/* Resolved (Month) */}
                     <td className="px-6 py-5 text-center">
-                      {client.needsDocsCount > 0 ? (
-                        <span className="text-purple-600 dark:text-purple-400 font-semibold">{client.needsDocsCount}</span>
-                      ) : (
-                        <span className="text-gray-300 dark:text-gray-600">0</span>
-                      )}
-                    </td>
-
-                    {/* High Impact */}
-                    <td className="px-6 py-5 text-center">
-                      {client.highImpactCount > 0 ? (
-                        <span className="text-amber-700 dark:text-amber-500 font-bold">
-                          {client.highImpactCount}
-                        </span>
+                      {client.resolvedThisMonth > 0 ? (
+                        <span className="text-teal-600 dark:text-teal-400 font-semibold">{client.resolvedThisMonth}</span>
                       ) : (
                         <span className="text-gray-300 dark:text-gray-600">0</span>
                       )}
