@@ -41,6 +41,7 @@ import {
   FolderUp,
   Store,
   Check,
+  FileDown,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
@@ -58,7 +59,7 @@ interface AppHeaderProps {
   ticketModalOpen?: boolean;
   onTicketModalChange?: (open: boolean) => void;
   defaultTicketAsin?: string;
-  onExport?: (type: 'active' | 'resolved' | 'weekly') => void;
+  onExport?: (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved') => void;
   documentFolderUrl?: string;
 }
 
@@ -145,11 +146,13 @@ export function AppHeader({
     ? format(lastSync, "MMM d, h:mm a")
     : 'Just now';
 
-  const handleExport = async (type: 'active' | 'resolved' | 'weekly') => {
+  const handleExport = async (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved') => {
     if (onExport) {
       setIsExporting(true);
       onExport(type);
-      setTimeout(() => setIsExporting(false), 1000);
+      // PDF exports take longer, give them more time
+      const timeout = type.startsWith('pdf-') ? 5000 : 1000;
+      setTimeout(() => setIsExporting(false), timeout);
     }
   };
 
@@ -303,14 +306,25 @@ export function AppHeader({
                   Export
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>PDF Report</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleExport('pdf-active')} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                  Active Violations PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('pdf-resolved')} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                  Resolved Violations PDF
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>CSV Export</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => handleExport('active')} disabled={isExporting}>
                   {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                  Active Violations
+                  Active Violations CSV
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleExport('resolved')} disabled={isExporting}>
                   {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                  Resolved Violations
+                  Resolved Violations CSV
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -448,13 +462,24 @@ export function AppHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>PDF Report</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleExport('pdf-active')} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                  Active Violations PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('pdf-resolved')} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                  Resolved Violations PDF
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>CSV Export</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => handleExport('active')} disabled={isExporting}>
                   {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                  Active Violations
+                  Active Violations CSV
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleExport('resolved')} disabled={isExporting}>
                   {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                  Resolved Violations
+                  Resolved Violations CSV
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
