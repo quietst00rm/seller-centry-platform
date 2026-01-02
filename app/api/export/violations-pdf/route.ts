@@ -317,30 +317,45 @@ function generateViolationsPDF(
     return doc.output('arraybuffer');
   }
 
-  // Prepare table data - 6 columns only (no IMPACT, no STATUS, no TOTAL row)
-  // Two-line header for FUNDS PROTECTED
+  // Prepare table data - 5 columns only (no OPENED)
+  // Single line content only - truncate with ellipsis
   const tableHeaders = [
     'ASIN',
     'PRODUCT',
     'ISSUE TYPE',
     'FUNDS\nPROTECTED',
-    'OPENED',
     'RESOLVED',
   ];
 
-  const tableData = violations.map((v) => [
-    v.asin || '-',
-    truncateText(v.productTitle, 40),
-    truncateText(v.reason, 30),
-    formatCurrency(v.atRiskSales || 0),
-    formatDateShort(v.date),
-    v.dateResolved ? formatDateShort(v.dateResolved) : '-',
-  ]);
+  // Store ASIN values for hyperlinks
+  const asinValues: string[] = [];
+
+  const tableData = violations.map((v) => {
+    asinValues.push(v.asin || '');
+    return [
+      v.asin || '-',
+      truncateText(v.productTitle, 50), // Wider column allows more chars
+      truncateText(v.reason, 40), // Wider column allows more chars
+      formatCurrency(v.atRiskSales || 0),
+      v.dateResolved ? formatDateShort(v.dateResolved) : '-',
+    ];
+  });
 
   // Track pages for footer
   let totalPagesEstimate = 1;
 
-  // Use autoTable - 6 columns, equal left/right margins
+  // Column widths in mm (total content width ~185mm on letter)
+  // Fixed widths: ASIN ~33mm, FUNDS ~30mm, RESOLVED ~26mm = 89mm fixed
+  // Flexible: PRODUCT + ISSUE TYPE split remaining ~96mm (55/41 split)
+  const colWidths = {
+    asin: 33,
+    product: 55,
+    issueType: 41,
+    funds: 30,
+    resolved: 26,
+  };
+
+  // Use autoTable - 5 columns, single line rows, ASIN hyperlinks
   autoTable(doc, {
     startY: yPos,
     head: [tableHeaders],
@@ -353,29 +368,44 @@ function generateViolationsPDF(
       fontStyle: 'bold',
       halign: 'center',
       valign: 'middle',
-      cellPadding: { top: 3, right: 2, bottom: 3, left: 2 },
+      cellPadding: { top: 3, right: 3, bottom: 3, left: 3 },
       minCellHeight: 12,
+      lineColor: [148, 163, 184], // #94A3B8 - visible borders between header cells
+      lineWidth: 0.3,
     },
     bodyStyles: {
       fontSize: 9,
       textColor: hexToRgb(BRAND.slateNavy),
-      cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
-      minCellHeight: 9,
+      cellPadding: { top: 3, right: 3, bottom: 3, left: 3 },
+      minCellHeight: 10, // Consistent row height ~28-32px
+      valign: 'middle',
+      overflow: 'ellipsize', // Single line with ellipsis
     },
     alternateRowStyles: {
       fillColor: hexToRgb(BRAND.alternateRow),
     },
     columnStyles: {
-      0: { cellWidth: 28, halign: 'center', fontStyle: 'bold', font: 'courier' }, // ASIN - centered, monospace bold
-      1: { cellWidth: 55, halign: 'left' }, // Product - left aligned, truncate
-      2: { cellWidth: 45, halign: 'left' }, // Issue Type - left aligned, truncate
-      3: { cellWidth: 25, halign: 'center' }, // Funds Protected - centered
-      4: { cellWidth: 22, halign: 'center' }, // Opened - centered MM/DD/YY
-      5: { cellWidth: 22, halign: 'center' }, // Resolved - centered MM/DD/YY
+      0: { cellWidth: colWidths.asin, halign: 'center', fontStyle: 'bold', font: 'courier' }, // ASIN
+      1: { cellWidth: colWidths.product, halign: 'left' }, // Product
+      2: { cellWidth: colWidths.issueType, halign: 'left' }, // Issue Type
+      3: { cellWidth: colWidths.funds, halign: 'center' }, // Funds Protected
+      4: { cellWidth: colWidths.resolved, halign: 'center' }, // Resolved
     },
     margin: { left: marginLeft, right: marginRight, bottom: marginBottom + 5 },
     tableLineColor: hexToRgb(BRAND.tableBorder),
-    tableLineWidth: 0.2,
+    tableLineWidth: 0.3,
+    rowPageBreak: 'avoid', // Prevent rows from being split across pages
+    didDrawCell: (data) => {
+      // Add Amazon hyperlink to ASIN cells
+      if (data.section === 'body' && data.column.index === 0) {
+        const asin = asinValues[data.row.index];
+        if (asin && asin !== '-') {
+          // Add invisible link over the cell
+          const url = `https://www.amazon.com/dp/${asin}`;
+          doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url });
+        }
+      }
+    },
     willDrawPage: (data) => {
       // Pages 2+ have NO header text - table continues at top margin
       if (data.pageNumber > 1) {
