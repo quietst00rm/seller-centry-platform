@@ -92,7 +92,7 @@ function filterByDateRange(
   });
 }
 
-// Calculate metrics from filtered data only
+// Calculate metrics from filtered data only (3 cards only, no avg resolution time)
 function calculateMetrics(violations: Violation[], tab: 'active' | 'resolved' | 'all') {
   const resolvedViolations = violations.filter(
     (v) => ['resolved', 'ignored', 'acknowledged'].includes(v.status.toLowerCase())
@@ -104,38 +104,22 @@ function calculateMetrics(violations: Violation[], tab: 'active' | 'resolved' | 
   const fundsProtected = resolvedViolations.reduce((sum, v) => sum + (v.atRiskSales || 0), 0);
   const fundsAtRisk = activeViolations.reduce((sum, v) => sum + (v.atRiskSales || 0), 0);
   const uniqueAsins = new Set(resolvedViolations.map((v) => v.asin).filter(Boolean)).size;
-
-  // Average resolution time
-  let avgResolutionDays: number | null = null;
-  const violationsWithBothDates = resolvedViolations.filter((v) => v.date && v.dateResolved);
-  if (violationsWithBothDates.length > 0) {
-    const totalDays = violationsWithBothDates.reduce((sum, v) => {
-      const opened = new Date(v.date);
-      const resolved = new Date(v.dateResolved!);
-      const days = Math.max(0, Math.ceil((resolved.getTime() - opened.getTime()) / (1000 * 60 * 60 * 24)));
-      return sum + days;
-    }, 0);
-    avgResolutionDays = Math.round(totalDays / violationsWithBothDates.length);
-  }
+  const uniqueActiveAsins = new Set(activeViolations.map((v) => v.asin).filter(Boolean)).size;
 
   if (tab === 'resolved') {
     return {
       metric1: { label: 'RESOLVED THIS PERIOD', value: resolvedViolations.length.toString(), subLabel: 'Violations Resolved' },
       metric2: { label: 'REVENUE PROTECTED', value: formatCurrency(fundsProtected), subLabel: 'Funds Secured' },
       metric3: { label: 'ASINS PROTECTED', value: uniqueAsins.toString(), subLabel: 'Unique Products' },
-      metric4: { label: 'AVG RESOLUTION TIME', value: avgResolutionDays !== null ? `${avgResolutionDays}` : 'N/A', subLabel: avgResolutionDays !== null ? 'Days to Resolve' : 'Pending' },
       summaryCount: resolvedViolations.length,
       summaryAmount: fundsProtected,
     };
   }
 
-  const highImpactCount = activeViolations.filter((v) => v.ahrImpact === 'High').length;
-
   return {
     metric1: { label: 'OPEN VIOLATIONS', value: activeViolations.length.toString(), subLabel: 'Currently Active' },
     metric2: { label: 'FUNDS AT RISK', value: formatCurrency(fundsAtRisk), subLabel: 'Potential Impact' },
-    metric3: { label: 'HIGH IMPACT', value: highImpactCount.toString(), subLabel: 'Require Attention' },
-    metric4: { label: 'AVG RESOLUTION TIME', value: avgResolutionDays !== null ? `${avgResolutionDays}` : 'N/A', subLabel: avgResolutionDays !== null ? 'Days to Resolve' : 'Pending' },
+    metric3: { label: 'ASINS AT RISK', value: uniqueActiveAsins.toString(), subLabel: 'Unique Products' },
     summaryCount: activeViolations.length,
     summaryAmount: fundsAtRisk,
   };
@@ -168,7 +152,7 @@ function generateViolationsPDF(
   const tabLabel = tab === 'resolved' ? 'Resolved' : tab === 'all' ? 'All' : 'Active';
   const statusLabel = tab === 'resolved' ? 'RESOLVED VIOLATIONS' : tab === 'active' ? 'ACTIVE VIOLATIONS' : 'ALL VIOLATIONS';
 
-  // Footer function
+  // Footer function with hyperlink
   const addFooter = (pageNum: number, totalPages: number) => {
     const footerY = pageHeight - 10; // 0.4" from bottom
 
@@ -176,25 +160,22 @@ function generateViolationsPDF(
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...hexToRgb(BRAND.coolGray));
 
-    doc.text(`Confidential - Prepared for ${storeName}`, marginLeft, footerY);
+    // Left: Report name with client
+    doc.text(`Account Health Report - ${storeName}`, marginLeft, footerY);
+
+    // Center: Page number
     doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
+
+    // Right: Hyperlinked URL
+    const linkText = 'sellercentry.com';
+    const linkX = pageWidth - marginRight - doc.getTextWidth(linkText);
     doc.setTextColor(...hexToRgb(BRAND.primaryOrange));
-    doc.text('sellercentry.com', pageWidth - marginRight, footerY, { align: 'right' });
+    doc.textWithLink(linkText, linkX, footerY, { url: 'https://sellercentry.com' });
   };
 
-  // Continuation header for pages 2+
-  const addContinuationHeader = () => {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...hexToRgb(BRAND.coolGray));
-    doc.text(`Account Health Report - ${storeName}`, marginLeft, marginTop);
-    doc.text(dateRangeLabel, pageWidth - marginRight, marginTop, { align: 'right' });
-
-    doc.setDrawColor(...hexToRgb(BRAND.tableBorder));
-    doc.setLineWidth(0.3);
-    doc.line(marginLeft, marginTop + 5, pageWidth - marginRight, marginTop + 5);
-
-    return marginTop + 14;
+  // Pages 2+ have NO header text - table continues directly at top margin
+  const getPage2StartY = () => {
+    return marginTop;
   };
 
   // ========== PAGE 1 HEADER (clean, no artifacts) ==========
@@ -268,38 +249,41 @@ function generateViolationsPDF(
     yPos += 12;
   }
 
-  // ========== METRIC CARDS (clean, no icons) ==========
-  const cardWidth = (contentWidth - 9) / 4; // 3mm gaps
-  const cardHeight = 28;
+  // ========== METRIC CARDS (3 cards only, equal 1/3 width) ==========
+  const cardGap = 4.5; // ~16px gap between cards (4.5mm ≈ 16px)
+  const totalGaps = cardGap * 2; // 2 gaps between 3 cards
+  const cardWidth = (contentWidth - totalGaps) / 3; // Each card is 1/3 of available width
+  const cardHeight = 32;
+  const cardPadding = 5; // 20px internal padding (5mm ≈ 20px)
 
-  const metricEntries = [metrics.metric1, metrics.metric2, metrics.metric3, metrics.metric4];
+  const metricEntries = [metrics.metric1, metrics.metric2, metrics.metric3];
 
   metricEntries.forEach((metric, index) => {
-    const cardX = marginLeft + index * (cardWidth + 3);
+    const cardX = marginLeft + index * (cardWidth + cardGap);
 
-    // Card background with border
+    // Card background with border (light gray bg, subtle border)
     doc.setFillColor(...hexToRgb(BRAND.lightGray));
     doc.setDrawColor(...hexToRgb(BRAND.tableBorder));
     doc.setLineWidth(0.3);
     doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 2, 2, 'FD');
 
-    // Label (uppercase, centered)
-    doc.setFontSize(8);
+    // Label (uppercase, centered) - 10pt Medium
+    doc.setFontSize(10);
     doc.setTextColor(...hexToRgb(BRAND.coolGray));
     doc.setFont('helvetica', 'bold');
-    doc.text(metric.label, cardX + cardWidth / 2, yPos + 8, { align: 'center' });
+    doc.text(metric.label, cardX + cardWidth / 2, yPos + cardPadding + 3, { align: 'center' });
 
-    // Value (large, centered)
-    doc.setFontSize(20);
+    // Value (large, centered) - 28pt Bold
+    doc.setFontSize(28);
     doc.setTextColor(...hexToRgb(BRAND.slateNavy));
     doc.setFont('helvetica', 'bold');
-    doc.text(metric.value, cardX + cardWidth / 2, yPos + 18, { align: 'center' });
+    doc.text(metric.value, cardX + cardWidth / 2, yPos + cardPadding + 16, { align: 'center' });
 
-    // Sublabel
-    doc.setFontSize(8);
+    // Sublabel (centered) - 10pt Regular
+    doc.setFontSize(10);
     doc.setTextColor(...hexToRgb(BRAND.coolGray));
     doc.setFont('helvetica', 'normal');
-    doc.text(metric.subLabel, cardX + cardWidth / 2, yPos + 24, { align: 'center' });
+    doc.text(metric.subLabel, cardX + cardWidth / 2, yPos + cardPadding + 23, { align: 'center' });
   });
 
   yPos += cardHeight + 14;
@@ -333,30 +317,30 @@ function generateViolationsPDF(
     return doc.output('arraybuffer');
   }
 
-  // Calculate totals
-  const totalFundsProtected = violations.reduce((sum, v) => sum + (v.atRiskSales || 0), 0);
-
-  // Prepare table data
-  const tableHeaders = ['ASIN', 'PRODUCT', 'ISSUE TYPE', 'FUNDS PROTECTED', 'IMPACT', 'STATUS', 'OPENED', 'RESOLVED'];
+  // Prepare table data - 6 columns only (no IMPACT, no STATUS, no TOTAL row)
+  // Two-line header for FUNDS PROTECTED
+  const tableHeaders = [
+    'ASIN',
+    'PRODUCT',
+    'ISSUE TYPE',
+    'FUNDS\nPROTECTED',
+    'OPENED',
+    'RESOLVED',
+  ];
 
   const tableData = violations.map((v) => [
     v.asin || '-',
     truncateText(v.productTitle, 40),
     truncateText(v.reason, 30),
     formatCurrency(v.atRiskSales || 0),
-    v.ahrImpact || '-',
-    v.status || '-',
     formatDateShort(v.date),
     v.dateResolved ? formatDateShort(v.dateResolved) : '-',
   ]);
 
-  // Add totals row
-  tableData.push(['TOTAL', '', '', formatCurrency(totalFundsProtected), '', '', '', '']);
-
   // Track pages for footer
   let totalPagesEstimate = 1;
 
-  // Use autoTable
+  // Use autoTable - 6 columns, equal left/right margins
   autoTable(doc, {
     startY: yPos,
     head: [tableHeaders],
@@ -368,8 +352,9 @@ function generateViolationsPDF(
       fontSize: 9,
       fontStyle: 'bold',
       halign: 'center',
+      valign: 'middle',
       cellPadding: { top: 3, right: 2, bottom: 3, left: 2 },
-      minCellHeight: 10,
+      minCellHeight: 12,
     },
     bodyStyles: {
       fontSize: 9,
@@ -381,55 +366,20 @@ function generateViolationsPDF(
       fillColor: hexToRgb(BRAND.alternateRow),
     },
     columnStyles: {
-      0: { cellWidth: 25, halign: 'center', fontStyle: 'bold', font: 'courier' }, // ASIN
-      1: { cellWidth: 45, halign: 'left' }, // Product
-      2: { cellWidth: 35, halign: 'left' }, // Issue Type
-      3: { cellWidth: 23, halign: 'right' }, // Funds Protected (header centered, data right)
-      4: { cellWidth: 16, halign: 'center' }, // Impact
-      5: { cellWidth: 18, halign: 'center' }, // Status
-      6: { cellWidth: 18, halign: 'center' }, // Opened
-      7: { cellWidth: 18, halign: 'center' }, // Resolved
+      0: { cellWidth: 28, halign: 'center', fontStyle: 'bold', font: 'courier' }, // ASIN - centered, monospace bold
+      1: { cellWidth: 55, halign: 'left' }, // Product - left aligned, truncate
+      2: { cellWidth: 45, halign: 'left' }, // Issue Type - left aligned, truncate
+      3: { cellWidth: 25, halign: 'center' }, // Funds Protected - centered
+      4: { cellWidth: 22, halign: 'center' }, // Opened - centered MM/DD/YY
+      5: { cellWidth: 22, halign: 'center' }, // Resolved - centered MM/DD/YY
     },
     margin: { left: marginLeft, right: marginRight, bottom: marginBottom + 5 },
     tableLineColor: hexToRgb(BRAND.tableBorder),
     tableLineWidth: 0.2,
-    didParseCell: (data) => {
-      // Color code impact column
-      if (data.section === 'body' && data.column.index === 4) {
-        const impact = data.cell.raw as string;
-        if (impact === 'High') {
-          data.cell.styles.textColor = hexToRgb(BRAND.criticalRed);
-          data.cell.styles.fontStyle = 'bold';
-        } else if (impact === 'Low') {
-          data.cell.styles.textColor = hexToRgb(BRAND.alertAmber);
-        } else {
-          data.cell.styles.textColor = hexToRgb(BRAND.coolGray);
-        }
-      }
-
-      // Color code status column
-      if (data.section === 'body' && data.column.index === 5) {
-        const status = (data.cell.raw as string).toLowerCase();
-        if (['resolved', 'ignored', 'acknowledged'].includes(status)) {
-          data.cell.styles.textColor = hexToRgb(BRAND.successGreen);
-        } else if (status === 'working') {
-          data.cell.styles.textColor = hexToRgb(BRAND.infoBlue);
-        } else if (['waiting', 'waiting on client'].includes(status)) {
-          data.cell.styles.textColor = hexToRgb(BRAND.alertAmber);
-        } else if (status === 'denied') {
-          data.cell.styles.textColor = hexToRgb(BRAND.criticalRed);
-        }
-      }
-
-      // Style totals row
-      if (data.section === 'body' && data.row.index === tableData.length - 1) {
-        data.cell.styles.fillColor = hexToRgb(BRAND.lightGray);
-        data.cell.styles.fontStyle = 'bold';
-      }
-    },
     willDrawPage: (data) => {
+      // Pages 2+ have NO header text - table continues at top margin
       if (data.pageNumber > 1) {
-        data.settings.startY = addContinuationHeader();
+        data.settings.startY = getPage2StartY();
       }
     },
     didDrawPage: (data) => {
