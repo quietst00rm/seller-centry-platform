@@ -10,6 +10,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -59,7 +62,7 @@ interface AppHeaderProps {
   ticketModalOpen?: boolean;
   onTicketModalChange?: (open: boolean) => void;
   defaultTicketAsin?: string;
-  onExport?: (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved') => void;
+  onExport?: (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved' | 'pdf-active-30' | 'pdf-active-90' | 'pdf-resolved-30' | 'pdf-resolved-90') => void;
   documentFolderUrl?: string;
 }
 
@@ -146,7 +149,7 @@ export function AppHeader({
     ? format(lastSync, "MMM d, h:mm a")
     : 'Just now';
 
-  const handleExport = async (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved') => {
+  const handleExport = async (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved' | 'pdf-active-30' | 'pdf-active-90' | 'pdf-resolved-30' | 'pdf-resolved-90') => {
     if (onExport) {
       setIsExporting(true);
       onExport(type);
@@ -308,14 +311,40 @@ export function AppHeader({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>PDF Report</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => handleExport('pdf-active')} disabled={isExporting}>
-                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                  Active Violations PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('pdf-resolved')} disabled={isExporting}>
-                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                  Resolved Violations PDF
-                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={isExporting}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Resolved Violations
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-resolved-30')}>
+                      Last 30 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-resolved-90')}>
+                      Last 90 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-resolved')}>
+                      All Time
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={isExporting}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Active Violations
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-active-30')}>
+                      Last 30 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-active-90')}>
+                      Last 90 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-active')}>
+                      All Time
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>CSV Export</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => handleExport('active')} disabled={isExporting}>
@@ -463,14 +492,40 @@ export function AppHeader({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuLabel>PDF Report</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => handleExport('pdf-active')} disabled={isExporting}>
-                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                  Active Violations PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('pdf-resolved')} disabled={isExporting}>
-                  {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                  Resolved Violations PDF
-                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={isExporting}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Resolved Violations
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-resolved-30')}>
+                      Last 30 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-resolved-90')}>
+                      Last 90 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-resolved')}>
+                      All Time
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={isExporting}>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Active Violations
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-active-30')}>
+                      Last 30 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-active-90')}>
+                      Last 90 Days
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf-active')}>
+                      All Time
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>CSV Export</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => handleExport('active')} disabled={isExporting}>
