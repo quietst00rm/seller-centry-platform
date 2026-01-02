@@ -45,73 +45,8 @@ export function LovableDashboardClient({ subdomain, user, storeName, merchantId,
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  const handleExport = async (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved' | 'pdf-active-30' | 'pdf-active-90' | 'pdf-resolved-30' | 'pdf-resolved-90') => {
-    // Handle PDF exports
-    if (type.startsWith('pdf-')) {
-      try {
-        // Parse export type to determine tab and date range
-        let tab: 'active' | 'resolved' = 'resolved';
-        let dateRange = 'all';
-
-        if (type.includes('active')) {
-          tab = 'active';
-        }
-        if (type.endsWith('-30')) {
-          dateRange = '30days';
-        } else if (type.endsWith('-90')) {
-          dateRange = '90days';
-        }
-
-        const params = new URLSearchParams({
-          subdomain,
-          tab,
-          dateRange,
-        });
-
-        const response = await fetch(`/api/export/violations-pdf?${params.toString()}`);
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Failed to generate PDF');
-        }
-
-        // Get filename from Content-Disposition header or use default
-        const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = `${subdomain}-violations-report-${new Date().toISOString().split('T')[0]}.pdf`;
-        if (contentDisposition) {
-          const match = contentDisposition.match(/filename="(.+)"/);
-          if (match) {
-            filename = match[1];
-          }
-        }
-
-        // Download the PDF
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        toast({
-          title: 'PDF Generated',
-          description: `${tab.charAt(0).toUpperCase() + tab.slice(1)} violations report downloaded.`,
-        });
-      } catch (error) {
-        console.error('PDF export error:', error);
-        toast({
-          title: 'Export Failed',
-          description: error instanceof Error ? error.message : 'There was an error generating the PDF.',
-          variant: 'destructive',
-        });
-      }
-      return;
-    }
-
-    // Handle CSV exports
+  const handleExport = (type: 'active' | 'resolved' | 'weekly') => {
+    // Handle CSV exports only - PDF exports are handled by the ExportReportModal
     if (violations.length === 0) {
       toast({
         title: 'No Data',

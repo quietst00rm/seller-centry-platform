@@ -4,10 +4,8 @@ import { getTenantBySubdomain, getViolations } from '@/lib/google/sheets';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Violation } from '@/types';
-import * as fs from 'fs';
-import * as path from 'path';
 
-// Brand colors
+// Brand colors (exact hex values from spec)
 const BRAND = {
   primaryOrange: '#E67E22',
   slateNavy: '#1E293B',
@@ -44,7 +42,7 @@ function formatCurrency(amount: number): string {
 function formatDateShort(dateStr: string | undefined): string {
   if (!dateStr) return '-';
   const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
+  if (isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
@@ -52,7 +50,7 @@ function formatDateShort(dateStr: string | undefined): string {
   });
 }
 
-// Format date to full format (December 3, 2025)
+// Format date to full spelled-out format (December 1, 2025)
 function formatDateFull(date: Date): string {
   return date.toLocaleDateString('en-US', {
     month: 'long',
@@ -61,12 +59,16 @@ function formatDateFull(date: Date): string {
   });
 }
 
+// Format date for filename (YYYY-MM-DD)
+function formatDateForFilename(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
 // Truncate text at word boundary
 function truncateText(text: string | undefined, maxLength: number): string {
   if (!text) return '-';
   if (text.length <= maxLength) return text;
 
-  // Find last space before maxLength
   const truncated = text.substring(0, maxLength);
   const lastSpace = truncated.lastIndexOf(' ');
 
@@ -76,98 +78,34 @@ function truncateText(text: string | undefined, maxLength: number): string {
   return truncated + '...';
 }
 
-// Parse date range string and return start/end dates
-function parseDateRange(dateRange: string): { start: Date; end: Date; label: string } {
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-
-  let start: Date;
-  let label: string;
-
-  switch (dateRange) {
-    case '7days':
-    case 'Last 7 Days':
-      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      start.setHours(0, 0, 0, 0);
-      label = `${formatDateFull(start)} - ${formatDateFull(end)}`;
-      break;
-    case '30days':
-    case 'Last 30 Days':
-      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      start.setHours(0, 0, 0, 0);
-      label = `${formatDateFull(start)} - ${formatDateFull(end)}`;
-      break;
-    case '90days':
-    case 'Last 90 Days':
-      start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      start.setHours(0, 0, 0, 0);
-      label = `${formatDateFull(start)} - ${formatDateFull(end)}`;
-      break;
-    case 'thisMonth':
-    case 'This Month':
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
-      label = `${formatDateFull(start)} - ${formatDateFull(end)}`;
-      break;
-    case 'all':
-    case 'All Time':
-    default:
-      start = new Date(2020, 0, 1); // Far past date
-      label = 'All Time';
-      break;
-  }
-
-  return { start, end, label };
-}
-
-// Filter violations by date range
-function filterByDateRange(violations: Violation[], dateRange: string, useResolvedDate: boolean): Violation[] {
-  if (dateRange === 'all' || dateRange === 'All Time') return violations;
-
-  const { start, end } = parseDateRange(dateRange);
-
+// Filter violations by custom date range
+function filterByDateRange(
+  violations: Violation[],
+  fromDate: Date,
+  toDate: Date,
+  useResolvedDate: boolean
+): Violation[] {
   return violations.filter((v) => {
     const dateStr = useResolvedDate ? (v.dateResolved || v.date) : v.date;
     const violationDate = new Date(dateStr);
-    return violationDate >= start && violationDate <= end;
+    return violationDate >= fromDate && violationDate <= toDate;
   });
-}
-
-// Filter by search term
-function filterBySearch(violations: Violation[], search: string): Violation[] {
-  if (!search) return violations;
-
-  const searchLower = search.toLowerCase();
-  return violations.filter(
-    (v) =>
-      v.asin.toLowerCase().includes(searchLower) ||
-      v.productTitle.toLowerCase().includes(searchLower) ||
-      v.reason.toLowerCase().includes(searchLower) ||
-      v.id.toLowerCase().includes(searchLower)
-  );
 }
 
 // Calculate metrics from filtered data only
 function calculateMetrics(violations: Violation[], tab: 'active' | 'resolved' | 'all') {
   const resolvedViolations = violations.filter(
-    (v) => v.status.toLowerCase() === 'resolved' ||
-           v.status.toLowerCase() === 'ignored' ||
-           v.status.toLowerCase() === 'acknowledged'
+    (v) => ['resolved', 'ignored', 'acknowledged'].includes(v.status.toLowerCase())
   );
   const activeViolations = violations.filter(
     (v) => !['resolved', 'ignored', 'acknowledged'].includes(v.status.toLowerCase())
   );
 
-  // Calculate total funds protected (from resolved)
   const fundsProtected = resolvedViolations.reduce((sum, v) => sum + (v.atRiskSales || 0), 0);
-
-  // Calculate funds at risk (from active)
   const fundsAtRisk = activeViolations.reduce((sum, v) => sum + (v.atRiskSales || 0), 0);
-
-  // Unique ASINs protected
   const uniqueAsins = new Set(resolvedViolations.map((v) => v.asin).filter(Boolean)).size;
 
-  // Average resolution time (days)
+  // Average resolution time
   let avgResolutionDays: number | null = null;
   const violationsWithBothDates = resolvedViolations.filter((v) => v.date && v.dateResolved);
   if (violationsWithBothDates.length > 0) {
@@ -191,7 +129,6 @@ function calculateMetrics(violations: Violation[], tab: 'active' | 'resolved' | 
     };
   }
 
-  // For active tab
   const highImpactCount = activeViolations.filter((v) => v.ahrImpact === 'High').length;
 
   return {
@@ -204,26 +141,13 @@ function calculateMetrics(violations: Violation[], tab: 'active' | 'resolved' | 
   };
 }
 
-// Load logo as base64
-function loadLogoBase64(): string | null {
-  try {
-    const logoPath = path.join(process.cwd(), 'public', 'logos', 'seller-centry-logo.png');
-    const logoBuffer = fs.readFileSync(logoPath);
-    return `data:image/png;base64,${logoBuffer.toString('base64')}`;
-  } catch (error) {
-    console.error('Failed to load logo:', error);
-    return null;
-  }
-}
-
-// Generate the PDF
+// Generate the PDF with all fixes
 function generateViolationsPDF(
   storeName: string,
   merchantId: string,
   violations: Violation[],
   tab: 'active' | 'resolved' | 'all',
-  dateRangeLabel: string,
-  search: string
+  dateRangeLabel: string
 ): ArrayBuffer {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -236,41 +160,29 @@ function generateViolationsPDF(
   const marginLeft = 15.24; // 0.6 inches
   const marginRight = 15.24;
   const marginTop = 12.7; // 0.5 inches
-  const marginBottom = 12.7;
+  const marginBottom = 15.24; // 0.6 inches
   const contentWidth = pageWidth - marginLeft - marginRight;
   let yPos = marginTop;
 
-  // Load logo
-  const logoBase64 = loadLogoBase64();
-
-  // Calculate metrics from filtered data
   const metrics = calculateMetrics(violations, tab);
   const tabLabel = tab === 'resolved' ? 'Resolved' : tab === 'all' ? 'All' : 'Active';
   const statusLabel = tab === 'resolved' ? 'RESOLVED VIOLATIONS' : tab === 'active' ? 'ACTIVE VIOLATIONS' : 'ALL VIOLATIONS';
 
-  // Track total pages for footer
-  let currentPage = 1;
-
-  // Add footer to page
-  const addFooter = (pageNum: number) => {
-    const footerY = pageHeight - marginBottom + 3;
+  // Footer function
+  const addFooter = (pageNum: number, totalPages: number) => {
+    const footerY = pageHeight - 10; // 0.4" from bottom
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...hexToRgb(BRAND.coolGray));
 
-    // Left: Confidential notice
     doc.text(`Confidential - Prepared for ${storeName}`, marginLeft, footerY);
-
-    // Center: Page number (will be updated at end)
-    doc.text(`Page ${pageNum}`, pageWidth / 2, footerY, { align: 'center' });
-
-    // Right: Website
+    doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, footerY, { align: 'center' });
     doc.setTextColor(...hexToRgb(BRAND.primaryOrange));
     doc.text('sellercentry.com', pageWidth - marginRight, footerY, { align: 'right' });
   };
 
-  // Add continuation header for pages 2+
+  // Continuation header for pages 2+
   const addContinuationHeader = () => {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -278,49 +190,34 @@ function generateViolationsPDF(
     doc.text(`Account Health Report - ${storeName}`, marginLeft, marginTop);
     doc.text(dateRangeLabel, pageWidth - marginRight, marginTop, { align: 'right' });
 
-    // Border below header
     doc.setDrawColor(...hexToRgb(BRAND.tableBorder));
     doc.setLineWidth(0.3);
-    doc.line(marginLeft, marginTop + 4, pageWidth - marginRight, marginTop + 4);
+    doc.line(marginLeft, marginTop + 5, pageWidth - marginRight, marginTop + 5);
 
-    return marginTop + 12;
+    return marginTop + 14;
   };
 
-  // ========== PAGE 1 HEADER ==========
+  // ========== PAGE 1 HEADER (clean, no artifacts) ==========
 
-  // Logo (left side)
-  if (logoBase64) {
-    try {
-      doc.addImage(logoBase64, 'PNG', marginLeft, yPos - 2, 30, 30);
-    } catch (e) {
-      // Fallback to text if image fails
-      doc.setFontSize(14);
-      doc.setTextColor(...hexToRgb(BRAND.slateNavy));
-      doc.setFont('helvetica', 'bold');
-      doc.text('SELLER', marginLeft, yPos + 8);
-      doc.setTextColor(...hexToRgb(BRAND.primaryOrange));
-      doc.text('CENTRY', marginLeft + 22, yPos + 8);
-    }
-  } else {
-    // Text fallback
-    doc.setFontSize(14);
-    doc.setTextColor(...hexToRgb(BRAND.slateNavy));
-    doc.setFont('helvetica', 'bold');
-    doc.text('SELLER', marginLeft, yPos + 8);
-    doc.setTextColor(...hexToRgb(BRAND.primaryOrange));
-    doc.text('CENTRY', marginLeft + 22, yPos + 8);
-  }
-
-  // Report Title (right aligned)
+  // Text-based logo: "SELLER" in navy, "CENTRY" in orange
   doc.setFontSize(24);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...hexToRgb(BRAND.slateNavy));
+  const sellerWidth = doc.getTextWidth('SELLER');
+  doc.text('SELLER', marginLeft, yPos + 7);
+  doc.setTextColor(...hexToRgb(BRAND.primaryOrange));
+  doc.text('CENTRY', marginLeft + sellerWidth + 2, yPos + 7);
+
+  // Report title (right aligned)
+  doc.setFontSize(28);
   doc.setTextColor(...hexToRgb(BRAND.slateNavy));
   doc.setFont('helvetica', 'bold');
-  doc.text('Account Health Report', pageWidth - marginRight, yPos + 6, { align: 'right' });
+  doc.text('Account Health Report', pageWidth - marginRight, yPos + 7, { align: 'right' });
 
-  yPos += 18;
+  yPos += 16;
 
   // Client name
-  doc.setFontSize(16);
+  doc.setFontSize(18);
   doc.setTextColor(...hexToRgb(BRAND.slateNavy));
   doc.setFont('helvetica', 'normal');
   doc.text(storeName, marginLeft, yPos);
@@ -328,7 +225,7 @@ function generateViolationsPDF(
 
   // Merchant ID
   if (merchantId) {
-    doc.setFontSize(11);
+    doc.setFontSize(12);
     doc.setTextColor(...hexToRgb(BRAND.coolGray));
     doc.text(`Merchant ID: ${merchantId}`, marginLeft, yPos);
     yPos += 7;
@@ -341,113 +238,98 @@ function generateViolationsPDF(
   doc.text(`Report Period: ${dateRangeLabel}`, marginLeft, yPos);
   yPos += 8;
 
-  // Status badge
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  const badgeWidth = doc.getTextWidth(statusLabel) + 8;
-  doc.setFillColor(...hexToRgb(BRAND.primaryOrange));
-  doc.roundedRect(marginLeft, yPos - 4, badgeWidth, 7, 1, 1, 'F');
-  doc.setTextColor(...hexToRgb(BRAND.white));
-  doc.text(statusLabel, marginLeft + 4, yPos + 1);
+  // Status badge (only if resolved)
+  if (tab === 'resolved') {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    const badgeWidth = doc.getTextWidth(statusLabel) + 10;
+    doc.setFillColor(...hexToRgb(BRAND.primaryOrange));
+    doc.roundedRect(marginLeft, yPos - 4, badgeWidth, 8, 2, 2, 'F');
+    doc.setTextColor(...hexToRgb(BRAND.white));
+    doc.text(statusLabel, marginLeft + 5, yPos + 2);
+    yPos += 12;
+  }
 
-  yPos += 16;
+  // Spacing (no horizontal lines)
+  yPos += 8;
 
-  // Divider
-  doc.setDrawColor(...hexToRgb(BRAND.coolGray));
-  doc.setLineWidth(0.3);
-  doc.line(marginLeft, yPos, pageWidth - marginRight, yPos);
-  yPos += 10;
-
-  // ========== EXECUTIVE SUMMARY LINE ==========
+  // ========== EXECUTIVE SUMMARY ==========
   if (tab === 'resolved' && metrics.summaryCount > 0) {
     doc.setFontSize(14);
     doc.setTextColor(...hexToRgb(BRAND.slateNavy));
     doc.setFont('helvetica', 'normal');
-    const summaryText = `${metrics.summaryCount} violations resolved protecting ${formatCurrency(metrics.summaryAmount)} in revenue`;
-    doc.text(summaryText, marginLeft, yPos);
-    yPos += 14;
+    doc.text(`${metrics.summaryCount} violations resolved protecting ${formatCurrency(metrics.summaryAmount)} in revenue`, marginLeft, yPos);
+    yPos += 12;
   } else if (tab === 'active' && metrics.summaryCount > 0) {
     doc.setFontSize(14);
     doc.setTextColor(...hexToRgb(BRAND.slateNavy));
     doc.setFont('helvetica', 'normal');
-    const summaryText = `${metrics.summaryCount} active violations with ${formatCurrency(metrics.summaryAmount)} at risk`;
-    doc.text(summaryText, marginLeft, yPos);
-    yPos += 14;
+    doc.text(`${metrics.summaryCount} active violations with ${formatCurrency(metrics.summaryAmount)} at risk`, marginLeft, yPos);
+    yPos += 12;
   }
 
-  // ========== METRIC CARDS ==========
-  const cardWidth = (contentWidth - 12) / 4; // 4mm gaps between cards
-  const cardHeight = 32;
-  const cardStartX = marginLeft;
+  // ========== METRIC CARDS (clean, no icons) ==========
+  const cardWidth = (contentWidth - 9) / 4; // 3mm gaps
+  const cardHeight = 28;
 
   const metricEntries = [metrics.metric1, metrics.metric2, metrics.metric3, metrics.metric4];
 
   metricEntries.forEach((metric, index) => {
-    const cardX = cardStartX + index * (cardWidth + 4);
+    const cardX = marginLeft + index * (cardWidth + 3);
 
-    // Card background
+    // Card background with border
     doc.setFillColor(...hexToRgb(BRAND.lightGray));
-    doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 2, 2, 'F');
-
-    // Card border
     doc.setDrawColor(...hexToRgb(BRAND.tableBorder));
     doc.setLineWidth(0.3);
-    doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 2, 2, 'S');
+    doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 2, 2, 'FD');
 
-    // Metric label (uppercase)
-    doc.setFontSize(6);
+    // Label (uppercase, centered)
+    doc.setFontSize(8);
     doc.setTextColor(...hexToRgb(BRAND.coolGray));
     doc.setFont('helvetica', 'bold');
     doc.text(metric.label, cardX + cardWidth / 2, yPos + 8, { align: 'center' });
 
-    // Metric value (large)
-    doc.setFontSize(18);
+    // Value (large, centered)
+    doc.setFontSize(20);
     doc.setTextColor(...hexToRgb(BRAND.slateNavy));
     doc.setFont('helvetica', 'bold');
-    doc.text(metric.value, cardX + cardWidth / 2, yPos + 20, { align: 'center' });
+    doc.text(metric.value, cardX + cardWidth / 2, yPos + 18, { align: 'center' });
 
-    // Sub label
-    doc.setFontSize(7);
-    doc.setTextColor(...hexToRgb(BRAND.primaryOrange));
+    // Sublabel
+    doc.setFontSize(8);
+    doc.setTextColor(...hexToRgb(BRAND.coolGray));
     doc.setFont('helvetica', 'normal');
-    doc.text(metric.subLabel, cardX + cardWidth / 2, yPos + 27, { align: 'center' });
+    doc.text(metric.subLabel, cardX + cardWidth / 2, yPos + 24, { align: 'center' });
   });
 
-  yPos += cardHeight + 16;
+  yPos += cardHeight + 14;
 
-  // ========== TABLE SECTION ==========
-
-  // Table header
-  doc.setFontSize(14);
+  // ========== TABLE SECTION HEADER ==========
+  doc.setFontSize(18);
   doc.setTextColor(...hexToRgb(BRAND.slateNavy));
   doc.setFont('helvetica', 'bold');
   doc.text(`${tabLabel} Violations`, marginLeft, yPos);
 
-  // Issue count and filter summary
-  doc.setFontSize(9);
+  doc.setFontSize(12);
   doc.setTextColor(...hexToRgb(BRAND.coolGray));
   doc.setFont('helvetica', 'normal');
-  let filterSummary = dateRangeLabel;
-  if (search) {
-    filterSummary += ` | Search: "${truncateText(search, 15)}"`;
-  }
-  doc.text(filterSummary, pageWidth - marginRight, yPos, { align: 'right' });
+  doc.text(dateRangeLabel, pageWidth - marginRight, yPos, { align: 'right' });
 
-  yPos += 4;
+  yPos += 5;
   doc.text(`${violations.length} issue${violations.length !== 1 ? 's' : ''} found`, marginLeft, yPos);
-  yPos += 8;
+  yPos += 10;
 
   // Handle empty results
   if (violations.length === 0) {
     doc.setFillColor(...hexToRgb(BRAND.lightGray));
-    doc.roundedRect(marginLeft, yPos, contentWidth, 35, 3, 3, 'F');
+    doc.roundedRect(marginLeft, yPos, contentWidth, 30, 3, 3, 'F');
 
     doc.setFontSize(12);
     doc.setTextColor(...hexToRgb(BRAND.coolGray));
     doc.setFont('helvetica', 'normal');
-    doc.text('No violations found for this period', pageWidth / 2, yPos + 20, { align: 'center' });
+    doc.text('No violations found for this period', pageWidth / 2, yPos + 17, { align: 'center' });
 
-    addFooter(1);
+    addFooter(1, 1);
     return doc.output('arraybuffer');
   }
 
@@ -455,21 +337,12 @@ function generateViolationsPDF(
   const totalFundsProtected = violations.reduce((sum, v) => sum + (v.atRiskSales || 0), 0);
 
   // Prepare table data
-  const tableHeaders = [
-    'ASIN',
-    'PRODUCT',
-    'ISSUE TYPE',
-    'FUNDS PROTECTED',
-    'IMPACT',
-    'STATUS',
-    'OPENED',
-    'RESOLVED',
-  ];
+  const tableHeaders = ['ASIN', 'PRODUCT', 'ISSUE TYPE', 'FUNDS PROTECTED', 'IMPACT', 'STATUS', 'OPENED', 'RESOLVED'];
 
   const tableData = violations.map((v) => [
     v.asin || '-',
-    truncateText(v.productTitle, 45),
-    truncateText(v.reason, 35),
+    truncateText(v.productTitle, 40),
+    truncateText(v.reason, 30),
     formatCurrency(v.atRiskSales || 0),
     v.ahrImpact || '-',
     v.status || '-',
@@ -478,18 +351,12 @@ function generateViolationsPDF(
   ]);
 
   // Add totals row
-  tableData.push([
-    'TOTAL',
-    '',
-    '',
-    formatCurrency(totalFundsProtected),
-    '',
-    '',
-    '',
-    '',
-  ]);
+  tableData.push(['TOTAL', '', '', formatCurrency(totalFundsProtected), '', '', '', '']);
 
-  // Use autoTable for proper pagination
+  // Track pages for footer
+  let totalPagesEstimate = 1;
+
+  // Use autoTable
   autoTable(doc, {
     startY: yPos,
     head: [tableHeaders],
@@ -498,32 +365,32 @@ function generateViolationsPDF(
     headStyles: {
       fillColor: hexToRgb(BRAND.slateNavy),
       textColor: hexToRgb(BRAND.white),
-      fontSize: 7,
+      fontSize: 9,
       fontStyle: 'bold',
-      halign: 'left',
-      cellPadding: 2,
+      halign: 'center',
+      cellPadding: { top: 3, right: 2, bottom: 3, left: 2 },
       minCellHeight: 10,
     },
     bodyStyles: {
-      fontSize: 7,
+      fontSize: 9,
       textColor: hexToRgb(BRAND.slateNavy),
-      cellPadding: 2,
+      cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
       minCellHeight: 9,
     },
     alternateRowStyles: {
       fillColor: hexToRgb(BRAND.alternateRow),
     },
     columnStyles: {
-      0: { cellWidth: 22, fontStyle: 'bold', font: 'courier' }, // ASIN - monospace
-      1: { cellWidth: 45 }, // Product
-      2: { cellWidth: 35 }, // Issue Type
-      3: { cellWidth: 22, halign: 'right' }, // Funds Protected
+      0: { cellWidth: 25, halign: 'center', fontStyle: 'bold', font: 'courier' }, // ASIN
+      1: { cellWidth: 45, halign: 'left' }, // Product
+      2: { cellWidth: 35, halign: 'left' }, // Issue Type
+      3: { cellWidth: 23, halign: 'right' }, // Funds Protected (header centered, data right)
       4: { cellWidth: 16, halign: 'center' }, // Impact
       5: { cellWidth: 18, halign: 'center' }, // Status
       6: { cellWidth: 18, halign: 'center' }, // Opened
       7: { cellWidth: 18, halign: 'center' }, // Resolved
     },
-    margin: { left: marginLeft, right: marginRight, bottom: marginBottom + 10 },
+    margin: { left: marginLeft, right: marginRight, bottom: marginBottom + 5 },
     tableLineColor: hexToRgb(BRAND.tableBorder),
     tableLineWidth: 0.2,
     didParseCell: (data) => {
@@ -533,8 +400,6 @@ function generateViolationsPDF(
         if (impact === 'High') {
           data.cell.styles.textColor = hexToRgb(BRAND.criticalRed);
           data.cell.styles.fontStyle = 'bold';
-        } else if (impact === 'Medium') {
-          data.cell.styles.textColor = hexToRgb(BRAND.alertAmber);
         } else if (impact === 'Low') {
           data.cell.styles.textColor = hexToRgb(BRAND.alertAmber);
         } else {
@@ -545,11 +410,11 @@ function generateViolationsPDF(
       // Color code status column
       if (data.section === 'body' && data.column.index === 5) {
         const status = (data.cell.raw as string).toLowerCase();
-        if (status === 'resolved' || status === 'ignored' || status === 'acknowledged') {
+        if (['resolved', 'ignored', 'acknowledged'].includes(status)) {
           data.cell.styles.textColor = hexToRgb(BRAND.successGreen);
         } else if (status === 'working') {
           data.cell.styles.textColor = hexToRgb(BRAND.infoBlue);
-        } else if (status === 'waiting' || status === 'waiting on client') {
+        } else if (['waiting', 'waiting on client'].includes(status)) {
           data.cell.styles.textColor = hexToRgb(BRAND.alertAmber);
         } else if (status === 'denied') {
           data.cell.styles.textColor = hexToRgb(BRAND.criticalRed);
@@ -562,28 +427,29 @@ function generateViolationsPDF(
         data.cell.styles.fontStyle = 'bold';
       }
     },
-    didDrawPage: (data) => {
-      const pageNum = data.pageNumber;
-
-      // Add continuation header on pages 2+
-      if (pageNum > 1) {
-        addContinuationHeader();
+    willDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        data.settings.startY = addContinuationHeader();
       }
-
-      // Add footer to each page
-      addFooter(pageNum);
-
-      currentPage = pageNum;
+    },
+    didDrawPage: (data) => {
+      totalPagesEstimate = Math.max(totalPagesEstimate, data.pageNumber);
     },
     showHead: 'everyPage',
   });
+
+  // Add footers to all pages
+  const totalPages = doc.internal.pages.length - 1;
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(i, totalPages);
+  }
 
   return doc.output('arraybuffer');
 }
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify user is authenticated
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -591,24 +457,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get query params
     const searchParams = request.nextUrl.searchParams;
     const subdomain = searchParams.get('subdomain');
     const tab = (searchParams.get('tab') as 'active' | 'resolved' | 'all') || 'resolved';
-    const dateRange = searchParams.get('dateRange') || 'all';
-    const search = searchParams.get('search') || '';
+    const fromDateStr = searchParams.get('fromDate');
+    const toDateStr = searchParams.get('toDate');
 
     if (!subdomain) {
       return NextResponse.json({ success: false, error: 'Subdomain is required' }, { status: 400 });
     }
 
-    // Fetch tenant info
+    // Parse dates
+    const now = new Date();
+    const fromDate = fromDateStr ? new Date(fromDateStr + 'T00:00:00') : new Date(2020, 0, 1);
+    const toDate = toDateStr ? new Date(toDateStr + 'T23:59:59') : now;
+
+    // Validate dates
+    if (fromDate > toDate) {
+      return NextResponse.json({ success: false, error: 'From date must be before to date' }, { status: 400 });
+    }
+
     const tenant = await getTenantBySubdomain(subdomain);
     if (!tenant) {
       return NextResponse.json({ success: false, error: 'Account not found' }, { status: 404 });
     }
 
-    // Fetch violations based on tab
+    // Fetch violations
     let violations: Violation[] = [];
     if (tab === 'all') {
       const [active, resolved] = await Promise.all([
@@ -620,18 +494,16 @@ export async function GET(request: NextRequest) {
       violations = await getViolations(tenant, tab);
     }
 
-    // For resolved tab, filter to only resolved/ignored/acknowledged statuses
+    // Filter by status for resolved tab
     if (tab === 'resolved') {
-      violations = violations.filter((v) => {
-        const status = v.status.toLowerCase();
-        return status === 'resolved' || status === 'ignored' || status === 'acknowledged';
-      });
+      violations = violations.filter((v) =>
+        ['resolved', 'ignored', 'acknowledged'].includes(v.status.toLowerCase())
+      );
     }
 
-    // Apply filters
+    // Apply date filter
     const useResolvedDate = tab === 'resolved';
-    violations = filterByDateRange(violations, dateRange, useResolvedDate);
-    violations = filterBySearch(violations, search);
+    violations = filterByDateRange(violations, fromDate, toDate, useResolvedDate);
 
     // Sort by date (newest first)
     violations.sort((a, b) => {
@@ -640,27 +512,31 @@ export async function GET(request: NextRequest) {
       return dateB.getTime() - dateA.getTime();
     });
 
-    // Get date range label for display
-    const { label: dateRangeLabel } = parseDateRange(dateRange);
+    // Create date range label
+    const isAllTime = fromDate.getFullYear() <= 2020 && toDate.getTime() >= now.getTime() - 86400000;
+    const dateRangeLabel = isAllTime
+      ? 'All Time'
+      : `${formatDateFull(fromDate)} - ${formatDateFull(toDate)}`;
 
-    // Generate the PDF
+    // Generate PDF
     const pdfBuffer = generateViolationsPDF(
       tenant.storeName,
       tenant.merchantId,
       violations,
       tab,
-      dateRangeLabel,
-      search
+      dateRangeLabel
     );
 
-    // Create filename with status included
+    // Filename with date range
     const sanitizedSubdomain = subdomain.replace(/[^a-zA-Z0-9-]/g, '');
-    const dateStr = new Date().toISOString().split('T')[0];
-    const filename = `${sanitizedSubdomain}-${tab}-report-${dateStr}.pdf`;
+    const fromStr = formatDateForFilename(fromDate);
+    const toStr = formatDateForFilename(toDate);
+    const filename = isAllTime
+      ? `${sanitizedSubdomain}-${tab}-report-all-time.pdf`
+      : `${sanitizedSubdomain}-${tab}-${fromStr}-to-${toStr}.pdf`;
 
     console.log(`[GET /api/export/violations-pdf] Generated PDF for ${subdomain} (${tab}) with ${violations.length} violations`);
 
-    // Return the PDF
     return new Response(pdfBuffer, {
       status: 200,
       headers: {
