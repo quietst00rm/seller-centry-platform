@@ -45,15 +45,27 @@ export function LovableDashboardClient({ subdomain, user, storeName, merchantId,
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  const handleExport = async (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved') => {
+  const handleExport = async (type: 'active' | 'resolved' | 'weekly' | 'pdf-active' | 'pdf-resolved' | 'pdf-active-30' | 'pdf-active-90' | 'pdf-resolved-30' | 'pdf-resolved-90') => {
     // Handle PDF exports
-    if (type === 'pdf-active' || type === 'pdf-resolved') {
+    if (type.startsWith('pdf-')) {
       try {
-        const tab = type === 'pdf-active' ? 'active' : 'resolved';
+        // Parse export type to determine tab and date range
+        let tab: 'active' | 'resolved' = 'resolved';
+        let dateRange = 'all';
+
+        if (type.includes('active')) {
+          tab = 'active';
+        }
+        if (type.endsWith('-30')) {
+          dateRange = '30days';
+        } else if (type.endsWith('-90')) {
+          dateRange = '90days';
+        }
+
         const params = new URLSearchParams({
           subdomain,
           tab,
-          dateRange: 'all',
+          dateRange,
         });
 
         const response = await fetch(`/api/export/violations-pdf?${params.toString()}`);
